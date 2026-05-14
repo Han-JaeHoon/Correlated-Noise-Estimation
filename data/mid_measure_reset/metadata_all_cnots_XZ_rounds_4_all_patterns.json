@@ -1,0 +1,164 @@
+{
+  "dataset_type": "all_cnot_round_patterns",
+  "mode": "mid_measure_reset",
+  "n_rounds": 4,
+  "shots": 1,
+  "error_types": [
+    "X",
+    "Z"
+  ],
+  "include_empty": true,
+  "num_cnot_locations": 24,
+  "num_patterns_per_cnot": 16,
+  "expected_num_samples": 384,
+  "saved_as_one_file": false,
+  "cnot_locations": [
+    {
+      "stab_type": "Z",
+      "stab_index": 0,
+      "control": 0,
+      "target": 9
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 0,
+      "control": 1,
+      "target": 9
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 0,
+      "control": 3,
+      "target": 9
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 0,
+      "control": 4,
+      "target": 9
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 1,
+      "control": 2,
+      "target": 10
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 1,
+      "control": 5,
+      "target": 10
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 2,
+      "control": 3,
+      "target": 11
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 2,
+      "control": 6,
+      "target": 11
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 3,
+      "control": 4,
+      "target": 12
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 3,
+      "control": 5,
+      "target": 12
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 3,
+      "control": 7,
+      "target": 12
+    },
+    {
+      "stab_type": "Z",
+      "stab_index": 3,
+      "control": 8,
+      "target": 12
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 0,
+      "control": 13,
+      "target": 0
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 0,
+      "control": 13,
+      "target": 1
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 1,
+      "control": 14,
+      "target": 1
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 1,
+      "control": 14,
+      "target": 2
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 1,
+      "control": 14,
+      "target": 4
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 1,
+      "control": 14,
+      "target": 5
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 2,
+      "control": 15,
+      "target": 3
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 2,
+      "control": 15,
+      "target": 4
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 2,
+      "control": 15,
+      "target": 6
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 2,
+      "control": 15,
+      "target": 7
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 3,
+      "control": 16,
+      "target": 7
+    },
+    {
+      "stab_type": "X",
+      "stab_index": 3,
+      "control": 16,
+      "target": 8
+    }
+  ],
+  "mid_measure": true,
+  "reset_after_measure": true,
+  "return_probs": false
+}
