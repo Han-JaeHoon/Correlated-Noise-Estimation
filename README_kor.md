@@ -2,6 +2,8 @@
 
 `d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
 
+> **다른 컴퓨터/Claude 세션에서 이어받으시나요?** [`HANDOFF.md`](HANDOFF.md) 부터 읽어주세요 — 현재 브랜치·최신 결과·다음 추천 step을 30초에 파악하는 entry point입니다.
+
 ---
 
 ## 1. 연구 목표

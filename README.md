@@ -4,6 +4,8 @@ A research codebase for analyzing whether the **location of a faulty CNOT gate**
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
 
+> **Picking this up from another machine / Claude session?** Start with [`HANDOFF.md`](HANDOFF.md) — a 30-second context loader pointing to the current branch, latest result, and recommended next step.
+
 ---
 
 ## 1. Research Goal
