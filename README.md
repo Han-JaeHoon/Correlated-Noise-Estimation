@@ -507,13 +507,20 @@ was then applied to `n_test` independently sampled test sequences for each true 
 
 At `(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 50`–`200`, seed 0 (data: `data/analysis/7_r3b_ceiling/`):
 
-| T | R1 per-class (analytic) | R3b per-class (MC) | R1 group | R3b group |
-|---|---|---|---|---|
-| 10 | 0.18 | 0.11 | 0.24 | 0.15 |
-| 30 | 0.31 | 0.09 | 0.40 | 0.12 |
-| 50 | 0.41 | 0.10 | 0.53 | 0.13 |
+8 cells, n_train=n_test=50–200, seeds 0–1 (data: `data/analysis/7_r3b_ceiling/`):
 
-R3b plateaus near 0.1 while R1 keeps improving with T. Group accuracy tells the same story.
+| (p_bg, p_high) | T | R1 per-class | R3b per-class | R1 group | R3b group |
+|---|---|---|---|---|---|
+| (0.001, 0.01) | 30  | 0.102 | 0.087 | 0.178 | 0.118 |
+| (0.001, 0.01) | 100 | 0.190 | 0.087 | 0.255 | 0.133 |
+| (0.001, 0.01) | 300 | 0.327 | 0.095 | 0.418 | 0.125 |
+| (0.005, 0.05) | 30  | 0.225 | 0.113 | 0.290 | 0.162 |
+| (0.005, 0.05) | 100 | 0.421 | 0.104 | 0.544 | 0.140 |
+| (0.01,  0.1)  | 10  | 0.182 | 0.112 | 0.243 | 0.149 |
+| (0.01,  0.1)  | 30  | 0.309 | 0.093 | 0.395 | 0.120 |
+| (0.01,  0.1)  | 50  | 0.406 | 0.101 | 0.527 | 0.130 |
+
+**R1 grows smoothly with T and with the (p_bg, p_high) signal-to-background ratio**; **R3b plateaus around 0.08–0.16 regardless of T or p**. At the longest T tested per cell, R1 already exceeds R3b by 3–4×. The 3-cell column at fixed (p_bg=0.001, p_high=0.01) makes the plateau especially clear — R1 climbs 0.10 → 0.19 → 0.33 as T goes 30 → 100 → 300, while R3b stays at 0.087 → 0.087 → 0.095. Group accuracy tells the same story.
 
 ### 14.4 Qualitative confirmation: marginals do diverge
 
@@ -563,4 +570,21 @@ Things to try, in roughly decreasing order of expected payoff:
 - The headline ceiling for sequence-level CNOT identification under physically realistic background noise remains the **R1 ceiling, 18/24 group accuracy** (or 19/24 with 9-Pauli).
 - Tasks #5 (dataset) and #6 (classifier) are unblocked. The classifier evaluation benchmark is still R1's per-round marginal Bayes accuracy; R3b is a cautionary example rather than a target.
 - The path to actually breaking the structural groups is some combination of a smarter decoder (item 14.7-1 or -2) or a full-sequence classifier (-3). All three are tractable in the same infrastructure built here.
+
+
+### 14.9 Variant: HammingNearestDecoder (multi-fault → nearest-lookup)
+
+The bare `LookupDecoder` defaults to identity correction on multi-fault rounds (detection events not in the 24×15 single-fault lookup). At p_bg = 0.01 the multi-fault rate per round is ≈ 0.24, so this branch is hit often. To isolate whether the multi-fault-identity policy is what drags R3b below R1, `src/decoder.py:HammingNearestDecoder` replaces it with: on a non-zero d not in the lookup, apply the correction of the lookup syndrome that is closest to d in Hamming distance (lex-min tie-break on the lookup syndrome). On d in the lookup or d == 0, behavior is identical to `LookupDecoder`.
+
+At `(p_bg, p_high) = (0.01, 0.1)`, `T = 30`, `n_train = n_test = 80`, `seed = 0`:
+
+| Decoder | per-class | group |
+|---|---|---|
+| R1 (analytic) | 0.309 | 0.395 |
+| R3b LookupDecoder | 0.114 | 0.152 |
+| R3b HammingNearestDecoder | 0.160 | 0.210 |
+
+Hamming is ~40 % better than the bare lookup but still well below R1. The conclusion of §14.6 is unchanged — any single-fault-hypothesis decoder we tried is dominated by the random-correction-noise problem — but it shows the "multi-fault → identity" branch was non-negligibly conservative; ~30 % of R3b's missing performance vs R1 is attributable to it.
+
+`scripts/compare_decoders.py` produces curves across T at one (p_bg, p_high) cell; outputs land in `data/analysis/7_r3b_ceiling/decoder_compare/`.
 

@@ -502,15 +502,20 @@ R3b decoder 의 정확한 spec 은 [docs/r3b_design.md](docs/r3b_design.md).
 
 ### 14.3 핵심 수치
 
-`(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 50`–`200`, seed 0 기준 (자료: `data/analysis/7_r3b_ceiling/`):
+8 cells, n_train=n_test=50–200, seed 0–1 (자료: `data/analysis/7_r3b_ceiling/`):
 
-| T | R1 per-class (analytic) | R3b per-class (MC) | R1 group | R3b group |
-|---|---|---|---|---|
-| 10 | 0.18 | 0.11 | 0.24 | 0.15 |
-| 30 | 0.31 | 0.09 | 0.40 | 0.12 |
-| 50 | 0.41 | 0.10 | 0.53 | 0.13 |
+| (p_bg, p_high) | T | R1 per-class | R3b per-class | R1 group | R3b group |
+|---|---|---|---|---|---|
+| (0.001, 0.01) | 30  | 0.102 | 0.087 | 0.178 | 0.118 |
+| (0.001, 0.01) | 100 | 0.190 | 0.087 | 0.255 | 0.133 |
+| (0.001, 0.01) | 300 | 0.327 | 0.095 | 0.418 | 0.125 |
+| (0.005, 0.05) | 30  | 0.225 | 0.113 | 0.290 | 0.162 |
+| (0.005, 0.05) | 100 | 0.421 | 0.104 | 0.544 | 0.140 |
+| (0.01,  0.1)  | 10  | 0.182 | 0.112 | 0.243 | 0.149 |
+| (0.01,  0.1)  | 30  | 0.309 | 0.093 | 0.395 | 0.120 |
+| (0.01,  0.1)  | 50  | 0.406 | 0.101 | 0.527 | 0.130 |
 
-R1 은 T 가 커질수록 향상, R3b 는 약 0.1 에서 평탄. Group 정확도도 같은 양상.
+**R1 은 T 와 (p_bg, p_high) signal-to-background 비율에 따라 부드럽게 향상**, **R3b 는 T 나 p 에 관계없이 0.08–0.16 plateau**. 각 cell 의 가장 큰 T 에서 이미 R1 이 R3b 의 3–4×. 특히 (p_bg=0.001, p_high=0.01) 의 T 변화 (30 → 100 → 300) 에서 R1 은 0.10 → 0.19 → 0.33, R3b 는 0.087 → 0.087 → 0.095 로 plateau 가 두드러짐.
 
 ### 14.4 정성적 확인 — marginal 은 갈라짐
 
@@ -560,4 +565,21 @@ R3b 의 within-group per-class 정확도 표준편차는 T=50 에서 모든 4개
 - 시퀀스 레벨 CNOT 식별의 headline ceiling 은 여전히 **R1 의 18/24 group 정확도** (또는 9-Pauli 일 경우 19/24).
 - Task #5 (데이터셋), Task #6 (분류기) 둘 다 unblock. Classifier 평가 기준점은 여전히 R1 의 per-round marginal Bayes. R3b 는 reference 가 아니라 cautionary example.
 - 구조적 그룹을 실제로 깨려면 §14.7 의 1~3 중 하나. 모두 이번에 만든 인프라로 trackable.
+
+
+### 14.9 변형: HammingNearestDecoder (multi-fault → 가장 가까운 lookup)
+
+기본 `LookupDecoder` 는 multi-fault round (detection event 가 24×15 single-fault lookup 에 없음) 에서 identity correction. p_bg = 0.01 이면 라운드 당 multi-fault 비율이 ≈ 0.24 라 이 branch 가 자주 발동. 이 multi-fault-identity 정책이 R3b 를 R1 아래로 끌어내리는 원인인지 분리하기 위해 `src/decoder.py:HammingNearestDecoder` 를 추가: lookup 에 없는 non-zero d 에 대해, lookup syndrome 중 Hamming 거리 가장 가까운 것의 correction 적용 (lex-min 으로 tie-break). d in lookup 또는 d == 0 에선 `LookupDecoder` 와 동일.
+
+`(p_bg, p_high) = (0.01, 0.1)`, `T = 30`, `n_train = n_test = 80`, `seed = 0`:
+
+| Decoder | per-class | group |
+|---|---|---|
+| R1 (analytic) | 0.309 | 0.395 |
+| R3b LookupDecoder | 0.114 | 0.152 |
+| R3b HammingNearestDecoder | 0.160 | 0.210 |
+
+Hamming 이 lookup 보다 ~40% 좋지만 여전히 R1 보다 훨씬 낮음. §14.6 의 결론은 변경 없음 — 어떤 single-fault hypothesis decoder 도 random-correction-noise 문제에 지배됨. 단 "multi-fault → identity" branch 가 적지 않게 보수적이었음을 보임 — R3b 의 R1 대비 손실의 ~30% 가 이 branch 때문.
+
+`scripts/compare_decoders.py` 가 한 (p_bg, p_high) cell 에서 T 별 곡선 생성, `data/analysis/7_r3b_ceiling/decoder_compare/` 로 출력.
 
