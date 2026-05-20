@@ -113,6 +113,47 @@ Deliverables:
   "R3b marginal 이 ambiguity 그룹을 깨는가" 라는 가설을 직접 답함.
   `drop_first_round=True` 가 default — round 0 는 frame=0 이라 decoder-agnostic.
 
+### 5.5 PennyLane bottleneck → fast_simulator (4b) — ~18:10 UTC
+첫 R1 baseline smoke 가 11분 후에도 안 끝나서 발견 — PennyLane T=20 sequence 가
+~3.5초/sequence. 24×60 sequences = 1400+초 (24분+). 너무 큼.
+
+해결: `src/fast_simulator.run_sequence_symbolic` (`26dbb15`). PennyLane
+회로 호출을 propagator 만으로 대체. PauliFrame + propagate_round 의 결과가
+PL 회로와 bit-identical 임이 이미 검증됐기 때문 (3b 의 360/360 일치).
+
+결과: 50 sequences (T=30, LookupDecoder): PennyLane 17.5초 → symbolic 1.7초.
+**~100× speedup, bit-identical (18/18 sanity check cases PASS)**.
+
+`ceiling_r3b.simulate_class_sequences` 가 default 로 symbolic 사용. 단
+`use_symbolic=False` 옵션으로 PennyLane 도 가능 (cross-check 용).
+
+### 5.6 첫 R3b sweep + 가설 검증 (4c) — ~18:25 UTC
+- `(p_bg, p_high) = (0.01, 0.1)`, T ∈ {10, 30, 50}, n_train=80, n_test=50,
+  seed=0 sweep + analysis (`52e29ae`).
+- **핵심 결과**: R3b 가 R1 보다 **훨씬 나쁨**. T=50 에서 R1 0.41 vs R3b 0.10
+  (4배 차이). T 가 커져도 R3b 는 ~0.10 plateau.
+- **그러나** R3b 의 marginal 이 ambiguity 그룹 멤버 간 정말 다름 (JS 0.04–0.09;
+  R1 에선 정의상 0). 즉 §13.7 의 메커니즘은 작동 — 그러나 wrong-correction
+  noise 가 dominant signal 을 압도.
+- README §14 작성 시작 (`d76f39a`), HANDOFF + NIGHT_LOG 갱신 (`14ee59e`).
+
+### 5.7 HammingNearestDecoder 변형 (7a–7c) — ~18:40 UTC
+- multi-fault round → identity 가 너무 보수적일까 ? 가장 가까운 lookup
+  syndrome 의 correction 사용 (`HammingNearestDecoder`, `8880e77`).
+- smoke (T=30): lookup 0.114 → hamming 0.160 (~40% 향상). R1 0.309 여전히 멀음.
+- T sweep (T=10, 30, 50, `62d530c`):
+  - R1: 0.180 → 0.312 → 0.416 (monotone increasing)
+  - lookup: 0.115 → 0.107 → 0.095 (**monotone *decreasing***)
+  - hamming: 0.122 → 0.149 → 0.186 (monotone increasing, R1 의 절반 기울기)
+- R3b 의 plateau 가 사실 천천히 감소 (lookup) 또는 천천히 증가 (hamming) 의
+  평균. multi-fault fallback 정책이 lex-min tie-break 보다 더 영향력.
+
+### 5.8 추가 partial sweep + README §14 grid 확장 (7b) — ~18:50 UTC
+- `compute_r3b_ceiling.py` 의 더 큰 grid (3 p-쌍 × 3 T) 가 5 cells 완료 후
+  T=300 의 무거움 + compare 와 동시 진행으로 인한 CPU 경쟁 때문에 cancel.
+- 5 cells 결과로도 trend 충분: R1 increasing, R3b plateau across 3 (p_bg, p_high)
+  값. README §14.3 의 table 을 8 cells 로 확장 (`8aa7e19`).
+
 ## 6. 결정 기록 (이유와 함께)
 
 > default 가 아닌 의사결정이 일어날 때마다 여기 기록.
@@ -145,6 +186,79 @@ Deliverables:
 
 상세 narrative 와 후속 액션 제안은 README §14 (영/한).
 
-## 9. 최종 요약 (밤샘 끝 시점에 작성)
+## 9. 최종 요약 (밤샘 끝)
 
-> 사용자가 깼을 때 가장 먼저 읽을 곳.
+### 한 줄 결과
+
+**§13.7 가설은 directionally TRUE / quantitatively FALSE** — R3b 의 per-round
+marginal 은 ambiguity 그룹 멤버 간 분명히 갈라지지만 (JS 0.04–0.09 vs R1 의
+0), 그로 인한 marginal-Bayes 정확도는 R1 보다 *훨씬 낮음* (R1 0.41 vs R3b
+lookup 0.10 / hamming 0.19 at T=50). lex-min single-fault decoder 가
+multi-fault background 환경에서 dominant signal 을 wrong-correction noise 로
+변환하기 때문.
+
+### 가장 먼저 봐야 할 것 (사용자용)
+
+1. **`README.md` §14** (영) 또는 `README_kor.md` §14 (한) — 결과 narrative.
+2. **`data/analysis/7_r3b_ceiling/decoder_compare/decoder_compare_curves.png`**
+   — 한 장으로 R1 vs lookup vs hamming 의 T-별 trend.
+3. **`data/analysis/7_r3b_ceiling/r3b_per_class_by_group.png`** — 24개 CNOT
+   별 R1 vs R3b accuracy bar chart (ambiguity 그룹 음영).
+4. **`HANDOFF.md`** — 갱신된 다음 step 추천 (Task #6 분류기 → Task #5 데이터셋).
+
+### 이번 밤샘에 push 된 commits
+
+```
+296e895  NIGHT_LOG.md 생성
+4134c4e  docs/r3b_design.md
+2c242f1  src/pauli_frame.py (3a)
+7d33c84  src/round_propagation.py + sanity check (3b)
+b7d8117  src/decoder.py LookupDecoder (3c)
+1761603  src/sequence_runner.py window path (3d)
+994629a  scripts/sanity_check_r3b_runner.py (3e)
+182a347  src/ceiling_r3b.py (4a)
+26dbb15  src/fast_simulator.py + scripts/compute_r3b_ceiling.py (4b)
+52e29ae  7_r3b_ceiling/ first data + scripts/analyze_r3b_ceiling.py (4c)
+d76f39a  README §14 영/한 (5/6a)
+14ee59e  HANDOFF.md + NIGHT_LOG (6b)
+8880e77  HammingNearestDecoder + compare_decoders.py (7a)
+8aa7e19  README §14.3 extended + partial sweep_v2 data (7b)
+62d530c  §14.9 updated with T-trend (7c)
+```
+
+(약 15개 commit, decoder-add-analysis 브랜치.)
+
+### 핵심 인프라 산출물
+
+| 파일 | 검증 상태 |
+|---|---|
+| `src/pauli_frame.py` | 8 unit test PASS |
+| `src/round_propagation.py` | A/B/C 회귀 PASS (360/360 + 27/27 + 360/360) |
+| `src/decoder.py` `LookupDecoder` / `HammingNearestDecoder` | unit test PASS, smoke PASS |
+| `src/sequence_runner.py` window path | fast vs window IdentityDecoder bit-identical (11 seeds) |
+| `src/fast_simulator.py` | PennyLane 과 bit-identical (18/18 cases), ~100× faster |
+| `src/ceiling_r3b.py` | smoke + 8-cell grid 양산 결과 일관성 |
+
+### 다음 step 추천
+
+HANDOFF.md §4 에 정리. 핵심: R3b가 ceiling 을 못 넘었으므로, R1 ceiling 이 the
+benchmark 가 됨. 따라서:
+
+1. **Task #6 (분류기)** ★ 우선순위 격상 — R1 marginal Bayes 가 baseline, 다른
+   classifier (MLP, GRU, Transformer) 들과 group accuracy gap 측정.
+2. **Task #5 (데이터셋)** — Task #6 학습용.
+3. (선택) §14.7 의 후속 R3b 변형 (posterior decoder, multi-round window) —
+   가설을 더 강한 형태로 재검증하고 싶을 때만.
+
+### 미해결 / 후속 고려사항
+
+- 큰 grid sweep (`sweep_v2`) 의 (0.005, 0.05, T=300), (0.01, 0.1, ×3) cells 가
+  실행 시간 절약을 위해 cancel 됨. 5 cells 로도 결론은 명확하지만, 완전한
+  9-cell grid 가 필요하면 `python scripts/compute_r3b_ceiling.py
+  --p-bg 0.005 0.01 --p-high 0.05 0.1 --T 300 --n-train 200 --n-test 200
+  --seed 1 --out-root data/analysis/7_r3b_ceiling/sweep_v2` 한 번 더.
+- HammingNearestDecoder 의 tie-break 정책 (lex-min lookup syndrome) 이 lex-min
+  (k, α) 와 다른 의미. §14.9 의 hamming 향상이 정말 "더 나은 정보 활용"
+  인지, 아니면 단순히 더 다양한 hypothesis 를 시도하는 noise 인지 ablation
+  필요.
+- 9-Pauli pool 변형 (§14.7-4) 은 비용 작은 실험인데 이번 밤샘엔 못 함.
