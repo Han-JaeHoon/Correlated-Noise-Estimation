@@ -48,9 +48,11 @@ Deliverables:
 - [x] 3c — `src/decoder.py` `LookupDecoder` (`b7d8117`)
 - [x] 3d — `src/sequence_runner.py` window-by-window 경로 (`1761603`)
 - [x] 3e — R3b runner smoke test (smoke + observation 기록)
-- [ ] 4단계 — R3b ceiling 계산 (3단계의 의도된 5/6단계 합쳐서 진행)
-- [ ] 5단계 — 가설 검증 분석 + plot
-- [ ] 6단계 — README §14 + HANDOFF 업데이트
+- [x] 4a — `src/ceiling_r3b.py` MC marginal-Bayes ceiling estimator (`182a347`)
+- [x] 4b — `src/fast_simulator.py` propagator-only sim (~100× speedup) + CLI (`26dbb15`)
+- [x] 4c — 첫 R3b sweep + 분석 + plot (`52e29ae`)
+- [x] 5/6a — README §14 영/한 + HANDOFF 업데이트 (`d76f39a`, 진행 중)
+- [⏳] 더 큰 grid sweep (3 p값 × 3 T값, n=200) — 백그라운드
 - [ ] 7단계 (옵션) — 작은 데이터셋 + histogram MLE baseline
 
 ## 5. 진행 로그 (append-only)
@@ -89,6 +91,28 @@ Deliverables:
 - Round-by-round runner: 매 라운드 1-round QNode, 누적 frame 을 `initial_error_list`
   로 주입. 결과: 새 frame = 이전 frame ⊕ (이 라운드 faults' residuals) ⊕ correction.
 
+### 5.3 LookupDecoder + window-runner 구현 (3a–3e) — 17:10–17:55 UTC
+- 3a (`src/pauli_frame.py`, `2c242f1`): 17-qubit symplectic frame + 게이트 update.
+  단위 테스트 8개 모두 통과.
+- 3b (`src/round_propagation.py`, `7d33c84`): 라운드 회로 게이트별 propagator
+  + 24×15 single-fault residual lookup. **버그 발견 & 수정**: ancilla outcome
+  은 z[anc] 가 아닌 **x[anc]** (Z basis 측정 = anti-commute with X 컴포넌트).
+  수정 후 PL 회로와 360/360 bit-for-bit 일치.
+- 3c (`src/decoder.py`, `b7d8117`): `LookupDecoder` 클래스. window_size=1,
+  lex-min tie-break, multi-fault → identity.
+- 3d (`src/sequence_runner.py`, `1761603`): window-by-window 경로.
+  `force_window_path=True` 옵션으로 회귀 테스트. IdentityDecoder 의 fast
+  vs window 경로가 11 random seeds 에서 syndromes 완전 일치.
+- 3e (`scripts/sanity_check_r3b_runner.py`, `994629a`): D/E/F smoke 모두 PASS.
+
+### 5.4 R3b ceiling 인프라 (4a) — ~17:55 UTC
+- `src/ceiling_r3b.py` (`182a347`): MC marginal-Bayes ceiling estimator.
+  R3b 가 round-iid 가 아니라 R1 의 analytic XOR-convolution 이 직접 통하지
+  않음. 대신 per-round marginal P(d|k) 을 MC 로 추정하고 R1 의 marginal
+  Bayes classifier 그대로 적용. 이는 *true ceiling 의 lower bound* 이지만
+  "R3b marginal 이 ambiguity 그룹을 깨는가" 라는 가설을 직접 답함.
+  `drop_first_round=True` 가 default — round 0 는 frame=0 이라 decoder-agnostic.
+
 ## 6. 결정 기록 (이유와 함께)
 
 > default 가 아닌 의사결정이 일어날 때마다 여기 기록.
@@ -99,7 +123,27 @@ Deliverables:
 
 ## 8. 핵심 발견 요약 (실시간 업데이트)
 
-> 가설 검증 결과 등 큰 finding 이 나올 때마다 한 줄씩.
+### 발견 1 (2026-05-20 18:30 UTC) — §13.7 가설 검증 완료
+
+**Directional claim TRUE / Quantitative claim FALSE.**
+
+- R3b 의 per-round marginal 이 ambiguity 그룹 멤버 간 분명히 다름
+  (pairwise JS 0.04–0.09; R1 에선 정확히 0). 즉 §13.7 가설의 *메커니즘*
+  — decoder 가 잘못된 correction 적용 → residual 가 후속 라운드 syndrome
+  에 다른 흔적 — 은 실제로 작동.
+- 그러나 결과 marginal-Bayes 정확도는 R1 보다 *훨씬 낮음*.
+  - (p_bg=0.01, p_high=0.1, T=50): R1 0.41 / R3b 0.10
+  - T 가 커져도 R3b 는 0.10 plateau (R1 은 향상)
+- 원인: lex-min single-fault decoder 가 평균 매 라운드 잘못된 correction
+  적용 (각 non-zero syndrome 에 평균 9개 (k,α) preimage). 잘못된 correction
+  의 누적이 dominant-CNOT 신호를 random 노이즈로 변환.
+- Within-group spread: R1 std 0.003–0.263 (lex-min favoring → 한 멤버만
+  ~1.0 정확도), R3b std ≤ 0.05 (모든 멤버 균등하게 나쁨).
+- 단 그룹 {14,15,17} 에서 R3b 평균 정확도 (0.167) 가 R1 (0.139) 보다 살짝
+  높음 — 가설 방향의 *작은* signal. 다른 X-stab interior 그룹들은 R3b 가 더
+  나쁨.
+
+상세 narrative 와 후속 액션 제안은 README §14 (영/한).
 
 ## 9. 최종 요약 (밤샘 끝 시점에 작성)
 

@@ -14,31 +14,32 @@ sequence만 보고 식별 가능한가**를 분석하는 연구. 현재 작업 �
 **`long-sequence-analysis`** — main 브랜치의 single-shot frame을
 sequence-level로 reframe한 **R1 시나리오**.
 
-## 2. 현재 위치 (commit `891eca3` 기준, 2026-05-21)
+## 2. 현재 위치 (2026-05-21 갱신)
 
-브랜치: `long-sequence-analysis`
+활성 브랜치: **`decoder-add-analysis`** (R3b 분석 완료 + README §14).
+이전 작업 보존 브랜치: `long-sequence-analysis` (commit `701680f` 기준).
 
 ```
-main ─── 5692656 (R1 인프라 스캐폴딩)
-            │
-            └─ 5074b1c (sanity check + README §12)
-                  │
-                  └─ 891eca3 (Task #3 R1 ceiling 결과 + README §13)  ← 여기
+main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis)
+                                          │
+                                          └─ … ─ d76f39a  (decoder-add-analysis)
+                                                  ↑
+                                                  R3b ceiling 완료 + README §14
 ```
 
 | 단계 | 상태 | 무엇이 됐나 |
 |---|---|---|
 | R1 인프라 (Phase 1) | ✅ | decoder ABC, BackgroundElevatedSampler, sequence runner |
-| Sanity check (Phase 1.5) | ✅ | main 브랜치 single-shot 결과 비트 단위 재현 |
-| **Task #3 R1 ceiling (Phase 2)** | ✅ | **4개 구조적 ambiguity 그룹 발견** |
-| Task #5 본 데이터셋 (Phase 4) | ⏸ pending | |
-| Task #6 분류기 (Phase 5) | ⏸ pending | |
-| Task #7 R3b 디코더 (Phase 6) | ⏸ **우선순위 격상됨** | §13.7 가설 검증 |
+| Sanity check (Phase 1.5) | ✅ | main single-shot 결과 비트 단위 재현 |
+| Task #3 R1 ceiling (Phase 2) | ✅ | 4 구조적 ambiguity 그룹 발견 (§13) |
+| **Task #7 R3b 디코더 (Phase 6)** | ✅ | **§13.7 가설 검증 완료 — directional TRUE / quantitative FALSE** (§14) |
+| Task #5 본 데이터셋 (Phase 4) | ⏸ pending (unblocked) | |
+| Task #6 분류기 (Phase 5) | ⏸ pending (unblocked) | |
 
 이전에 있던 Task #4 (72-pair sequence 운명)는 Task #3에 흡수돼서 별도 진행
-불필요. Task #2 (파라미터 픽)는 Task #7 결과 보고 결정 권장.
+불필요. Task #2 (파라미터 픽)는 R3b 결과 봤으니 진행 가능.
 
-## 3. 가장 중요한 발견 — Task #3 ceiling
+## 3. 핵심 발견 1 — Task #3 ceiling
 
 자세한 내용은 [README.md §13](README.md#13-r1-ceiling-result-phase-2--task-3).
 
@@ -59,48 +60,78 @@ CNOT으로 제한됨. 어떤 알고리즘도, 어떤 T로도 안 깨지는 **4�
 stabilizer 멤버십" 동일성. Pauli pool 변경으로는 못 깸. 자세한 설명은
 README §13.5.
 
-**열린 가설** (README §13.7): **Window decoder (R3b)를 추가하면 구조적
-그룹도 깨질 수 있을 것으로 추측**. 동일 syndrome → 동일 correction → 다른
-실제 residual → 후속 라운드에서 구별 가능한 흔적. **미검증, 다음 step의
-주된 동기.**
+## 3.5 핵심 발견 2 — Task #7 R3b ceiling
+
+자세한 내용은 [README.md §14](README.md#14-r3b-ceiling-result-branch-decoder-add-analysis).
+
+§13.7 가설을 직접 검증:
+
+| 주장 | 결과 |
+|---|---|
+| R3b 의 per-round marginal 이 그룹 멤버 간 다르다 (decoder 가 정보를 후속 라운드에 누설) | ✅ 확인 (pairwise JS 0.04–0.09, R1 에선 정확히 0) |
+| 그러므로 R3b 가 ambiguity 그룹을 깨고 R1 ceiling 을 능가 | ❌ **거짓**. R3b 가 R1 보다 *나쁨* — R1 0.41 vs R3b 0.10 (T=50) |
+
+원인: lex-min single-fault decoder 가 거의 매 라운드 잘못된 correction 을
+적용 (각 non-zero syndrome 당 평균 9개 preimage). 잘못된 correction 의
+누적 효과가 dominant-CNOT signal 을 random 노이즈로 흩뜨림.
+
+후속 액션 후보 (README §14.7):
+1. Posterior-aware decoder (Bayes-averaged correction)
+2. Multi-round window
+3. Full-sequence ML decoder
+4. Restricted Pauli pool
 
 ## 4. 다음 step 추천 순서
 
-1. **Task #7 부분 착수 (R3b decoder)** ★ — `src/decoder.py`에 lookup
-   decoder 클래스 구현, `src/sequence_runner.py:72`의 `NotImplementedError`
-   경로 채우기 (window state hand-off). R3b ceiling 계산해서 §13.7 가설
-   직접 검증.
-2. **Task #5 본 데이터셋** — 24 faulty_cnot × T sweep × N. group accuracy
-   메트릭 기반.
-3. **Task #6 분류기** — histogram MLE → MLP → GRU/Transformer, ceiling과
-   gap 비교.
+R3b 결과로 우선순위 재정렬:
+
+1. **Task #6 분류기 (Phase 5)** ★ — R1 ceiling 이 헤드라인 benchmark 임이
+   확정됐으니 (R3b 가 ceiling 넘는 데 실패) classifier 페이즈로 진행. histogram
+   MLE → MLP → GRU/Transformer. group accuracy 기준 R1 ceiling 1.0 와 gap 측정.
+2. **Task #5 본 데이터셋 (Phase 4)** — Task #6 학습용. 24 faulty_cnot × T
+   sweep × N.
+3. **(선택) §14.7 의 후속 R3b 변형** — posterior decoder, multi-window,
+   restricted pool. 가설을 더 강한 형태로 재검증하고 싶을 때만.
 
 ## 5. 핵심 파일 맵
 
-**코드:**
+**코드 (Phase 1–2, `long-sequence-analysis` 시점부터):**
 | 파일 | 역할 |
 |---|---|
-| `src/ceiling.py` | Task #3 core: XOR-convolution + Bayes classifier |
-| `src/decoder.py` | `Decoder` ABC, R3b 확장점 |
-| `src/sequence_runner.py:72` | R3b 미구현 경로 (다음 task에서 채울 곳) |
+| `src/ceiling.py` | Task #3 core: XOR-convolution + Bayes classifier (R1 ceiling) |
+| `src/decoder.py` | `Decoder` ABC + `IdentityDecoder` + `LookupDecoder` (R3b) |
+| `src/sequence_runner.py` | fast path (Identity) + window-by-window path (R3b) |
 | `src/stochastic_faults.py` | `BackgroundElevatedSampler` |
 | `src/sequence_dataset.py` | R1 데이터셋 생성 헬퍼 |
+
+**코드 (Phase 6 R3b 추가, `decoder-add-analysis`):**
+| 파일 | 역할 |
+|---|---|
+| `src/pauli_frame.py` | 17-qubit symplectic frame, in-place gate update |
+| `src/round_propagation.py` | stabilizer_round 의 symbolic propagator + single-fault residual lookup |
+| `src/fast_simulator.py` | propagator-only sequence simulator (~100× faster than PennyLane runner, bit-identical) |
+| `src/ceiling_r3b.py` | MC marginal-Bayes ceiling estimator |
 
 **스크립트:**
 | 파일 | 역할 |
 |---|---|
-| `scripts/sanity_check_r1_infra.py` | 회귀 테스트 (먼저 돌릴 것) |
-| `scripts/compute_r1_ceiling.py` | (p_bg, p_high, T) sweep CLI |
-| `scripts/analyze_ceiling_groups.py` | 그룹 구조 + 15p vs 9p 비교 |
+| `scripts/sanity_check_r1_infra.py` | R1 회귀 테스트 (먼저 돌릴 것) |
+| `scripts/sanity_check_round_propagation.py` | symbolic propagator 회귀 |
+| `scripts/sanity_check_fast_simulator.py` | symbolic == PennyLane 회귀 + benchmark |
+| `scripts/sanity_check_r3b_runner.py` | R3b end-to-end smoke |
+| `scripts/compute_r1_ceiling.py` | (p_bg, p_high, T) R1 sweep CLI |
+| `scripts/compute_r3b_ceiling.py` | (p_bg, p_high, T) R3b sweep CLI |
+| `scripts/analyze_ceiling_groups.py` | R1 그룹 구조 + 15p vs 9p 비교 |
+| `scripts/analyze_r3b_ceiling.py` | R3b 의 within-group spread + marginal JS |
 | `scripts/generate_r1_sequences.py` | R1 데이터셋 생성 CLI |
 
 **산출물:**
 | 경로 | 내용 |
 |---|---|
-| `data/analysis/6_sequence_ceiling/lookup_reset.npy` | 24×15 single-fault syndrome lookup |
-| `data/analysis/6_sequence_ceiling/ambiguity_groups.json` | 4개 그룹의 정식 정의 |
-| `data/analysis/6_sequence_ceiling/ceiling_compare_curves.png` | 15p vs 9p 비교 plot |
-| `data/analysis/6_sequence_ceiling/ceiling_compare_grid.csv` | sweep 결과 표 |
+| `data/analysis/6_sequence_ceiling/` | R1 ceiling: lookup, 그룹 json, sweep CSV, curves PNG |
+| `data/analysis/7_r3b_ceiling/` | R3b ceiling: marginals npz, R1 vs R3b CSV, group-별 plot, within-group spread CSV, JS divergence CSV |
+| `docs/r3b_design.md` | R3b decoder/runner 의 정식 spec |
+| `NIGHT_LOG.md` | 2026-05-20 밤샘 작업의 시간순 진행 로그 (R3b 인프라 + 분석 통째) |
 
 **문서:**
 - [README.md](README.md) — 영어 메인 문서. §1~§11은 main 브랜치 (single-shot frame), §12는 R1 인프라, §13은 Task #3 ceiling 결과
@@ -126,19 +157,26 @@ README §13.5.
 source syndrome_env/bin/activate
 
 # R1 인프라 회귀 테스트 — ~30초
-python scripts/sanity_check_r1_infra.py
-# 기대 출력 끝줄: "OVERALL: PASS"
+python scripts/sanity_check_r1_infra.py            # 끝줄: "OVERALL: PASS"
 
-# Task #3 결과 재현 — ~3분
+# R3b infra 회귀 — ~1분 (PennyLane vs symbolic)
+python scripts/sanity_check_round_propagation.py   # 끝줄: "OVERALL: PASS"
+python scripts/sanity_check_fast_simulator.py      # 끝줄: "OVERALL: PASS"
+python scripts/sanity_check_r3b_runner.py          # 끝줄: "OVERALL: PASS"
+
+# R1 ceiling 재현 — ~3분
 python scripts/analyze_ceiling_groups.py
-# 기대 출력에 다음이 포함:
+# 기대 출력에:
 #   "15-Pauli ambiguity groups: [[6, 7], [14, 15, 17], [18, 19, 20], [22, 23]]"
 #   "  asymptotic per-class ceiling = 0.7500"
-#   " 9-Pauli ambiguity groups: [[14, 15, 17], [18, 19, 20], [22, 23]]"
-#   "  asymptotic per-class ceiling = 0.7917"
+
+# R3b ceiling 재현 (작은 grid) — ~1분
+python scripts/compute_r3b_ceiling.py --p-bg 0.01 --p-high 0.1 --T 30
+python scripts/analyze_r3b_ceiling.py
+# 기대: T=30 cell 에서 R1 ≈ 0.31, R3b ≈ 0.09, JS divergence 0.04–0.09
 ```
 
-두 스크립트 다 통과하면 코드 상태 정상 — 거기서부터 다음 task 진행 가능.
+모두 통과하면 R1 + R3b 인프라 정상 — 거기서부터 Task #6 (분류기) 진행 가능.
 
 ## 8. 대화 맥락은 어디 있나
 
