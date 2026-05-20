@@ -163,3 +163,54 @@ class LookupDecoder(Decoder):
         x_corr = self._residuals[k, alpha, 0].copy()
         z_corr = self._residuals[k, alpha, 1].copy()
         return Correction(x_correction=x_corr, z_correction=z_corr)
+
+
+class HammingNearestDecoder(LookupDecoder):
+    """
+    Variant of LookupDecoder for multi-fault rounds.
+
+    On round t the observed detection event d is often not in the single-fault
+    lookup (multi-fault round). LookupDecoder defaults to identity in that
+    case. HammingNearestDecoder instead picks the lookup syndrome σ closest
+    to d in Hamming distance and applies its (lex-min) residual.
+
+    For d == 0 still returns identity. For d in the lookup, behavior is
+    identical to LookupDecoder.
+
+    This is intended only as a quick exploration of whether the "do something
+    for multi-fault rounds" branch matters for the R3b ceiling — not as a
+    physically motivated decoder.
+    """
+
+    def __init__(self, reset: bool = True, n: int = n_data):
+        super().__init__(reset=reset, n=n)
+        # Pre-compute lex-min syndrome list once (in lookup order)
+        self._lookup_syndromes_sorted = sorted(self._lex_min.keys())
+
+    def decode_window(self, detection_events: np.ndarray) -> Correction:
+        d = np.asarray(detection_events[0], dtype=np.int64).reshape(-1)
+        if d.size != 8:
+            raise ValueError(f"HammingNearestDecoder expects 8-bit detection event, got size {d.size}")
+        s = int(np.dot(d, 1 << np.arange(d.size)))
+
+        if s == 0:
+            return Correction.identity(self._n)
+
+        if s in self._lex_min:
+            k, alpha = self._lex_min[s]
+        else:
+            # find nearest lookup syndrome by Hamming distance, with lex-min
+            # syndrome int as a second-key tie-break for determinism
+            best_dist = 9
+            best_s = None
+            for cand in self._lookup_syndromes_sorted:
+                d_h = bin(cand ^ s).count("1")
+                if d_h < best_dist or (d_h == best_dist and best_s is None):
+                    best_dist = d_h
+                    best_s = cand
+            assert best_s is not None
+            k, alpha = self._lex_min[best_s]
+
+        x_corr = self._residuals[k, alpha, 0].copy()
+        z_corr = self._residuals[k, alpha, 1].copy()
+        return Correction(x_correction=x_corr, z_correction=z_corr)
