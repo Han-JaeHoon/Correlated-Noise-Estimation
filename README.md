@@ -317,3 +317,68 @@ Every conclusion in this study depends on the following assumptions:
 5. **No measurement / reset noise**: ancilla measurement and reset are themselves perfect.
 
 If any of these are relaxed, the analysis results (especially the 72-pair collision count) must be re-evaluated.
+
+---
+
+## 12. Long-sequence frame (branch `long-sequence-analysis`)
+
+Sections 1–11 analyze a **single-shot** frame: one fault event, one syndrome string, identify the (CNOT, Pauli) pair. That frame hit a hard wall — 72 (CNOT, Pauli) collisions that are invariant under round count and measurement mode. The branch `long-sequence-analysis` reframes the problem to bypass that wall using **sequence-level statistics**.
+
+### 12.1 Problem reframing (R1 scenario)
+
+| Aspect | Single-shot (main) | R1 (this branch) |
+|---|---|---|
+| Fault occurrence | Single deterministic event at chosen rounds | **Every round, every CNOT** rolls Bernoulli |
+| Per-CNOT rate | n/a | Background `p_bg` on all 24 CNOTs, **elevated `p_high`** on one designated CNOT |
+| Pauli per event | Fixed pair | **Uniform draw from 15 non-identity 2-qubit Paulis** (II excluded) |
+| Observable | One syndrome string | `(T, 8)` syndrome stream |
+| Target | (CNOT, Pauli) joint | **Dominant CNOT only** (Pauli marginalized) |
+| Decoder | n/a | Pluggable — R1 uses `IdentityDecoder` (no-op) |
+
+The hope: even when single-round syndromes collide, the **distributions over T-round sequences** induced by different dominant CNOTs may be distinguishable, breaking the 72-pair ceiling.
+
+### 12.2 New modules
+
+| File | Role |
+|---|---|
+| `src/decoder.py` | `Decoder` ABC + `Correction` dataclass + `IdentityDecoder`. Extension point for window decoders (R3b lookup decoder etc.) |
+| `src/stochastic_faults.py` | `BackgroundElevatedSampler(p_bg, p_high, faulty_cnot_id, rng)` — per-round per-CNOT Bernoulli + uniform 15-Pauli sampling |
+| `src/sequence_runner.py` | `run_sequence(T, sampler, decoder, ...)` — single-QNode fast path for `IdentityDecoder`; non-Identity decoder path raises `NotImplementedError` until window state hand-off is added |
+| `src/sequence_dataset.py` | `generate_r1_dataset(...)` + `save_r1_dataset(...)` — N samples of `(T, 8)` syndromes with seeds and oracle fault logs |
+
+### 12.3 New scripts
+
+| Script | Role |
+|---|---|
+| `scripts/generate_r1_sequences.py` | CLI for R1 dataset generation. Output: `data/r1_sequences/{baseline\|cnotXX}/T{T}_pbg{p}_phigh{p}_seed{s}/{reset\|no_reset}/` |
+| `scripts/sanity_check_r1_infra.py` | Regression test — see §12.4 |
+
+### 12.4 Sanity check (passing)
+
+The new infrastructure reproduces main-branch single-shot results bit-for-bit on a controllable case.
+
+- **Test B** — sampler dict structure: For all 216 = 24 CNOT × 9 Pauli pair cases, `BackgroundElevatedSampler(p_bg=0, p_high=1, faulty_cnot_id=k)` emits fault dicts whose `(round, control, target, error_wires, error_types)` match `make_fixed_cnot_fault_schedule`'s output (extra fields `cnot_id`, `pauli_pair` allowed).
+- **Test C** — end-to-end syndrome equality: For all 24 CNOTs with Pauli=XZ at every round of a T=2 sequence, a forced-deterministic sampler driven through `run_sequence` produces `(T, 8)` syndromes bit-identical to the main-branch path (`make_fixed_cnot_fault_schedule` + `make_repeated_stabilizer_qnode`). Verified under both `reset` and `no_reset` modes. **24/24 PASS** for each mode.
+
+This validates the wiring `sampler → fault_schedule format → QNode → reshape`. The stochastic-sampling itself is delegated to numpy and not unit-tested separately.
+
+### 12.5 Capability summary
+
+What the R1 infrastructure can produce today, with no further coding:
+
+- Datasets of shape `(N, T, 8) uint8` with deterministic seeds + per-sample oracle fault logs
+- Knobs: `faulty_cnot_id ∈ {None, 0..23}`, `p_bg, p_high ∈ [0,1]`, `T ∈ ℤ⁺`, `reset` / `no_reset`
+- Scenarios: R1 main experiment, baseline (no elevated CNOT), reproduction of single-shot results via forced sampler
+
+Open extension points: non-Identity decoder path (window state hand-off in `sequence_runner.py:72`), final data-qubit measurement, alternative Pauli pools, Stim backend, code distance > 3.
+
+### 12.6 Next step — device viability map
+
+`p_bg` and `p_high` are properties of the physical device (current superconducting two-qubit gate errors ≈ 10⁻³ – 10⁻²; degraded CNOTs reach 10⁻² – 10⁻¹), not parameters we tune. `T` is an experimental design choice bounded by coherence time. The next step is therefore not "pick parameters" but **characterize the regime of viability**:
+
+> On a grid over `(p_bg, p_high, T)`, compute the theoretical maximum dominant-CNOT identification accuracy (Bayes-optimal classifier on the per-round syndrome distribution, with Pauli marginalized). The output is a *viability map* answering:
+> 1. For which device parameter regimes is the identification task feasible?
+> 2. How long must one observe (T) to achieve a target accuracy?
+> 3. Which of the 72 original collision pairs are broken at the sequence level, and which survive as fundamental limits?
+
+This ceiling is also the ceiling for any trained classifier, so it doubles as an evaluation benchmark for the model phase that follows.

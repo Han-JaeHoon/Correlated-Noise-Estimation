@@ -314,3 +314,68 @@ python scripts/analyze_cross_pauli_cross_cnot_pairs.py --n-rounds 2 --error-roun
 5. **측정/reset 노이즈 없음**: ancilla 측정/reset 자체는 완벽
 
 이 가정들이 완화되면 분석 결과(특히 72쌍 충돌)는 다시 평가 필요.
+
+---
+
+## 12. Long-sequence frame (브랜치 `long-sequence-analysis`)
+
+1~11절은 **single-shot** frame을 분석합니다 — 한 번의 fault event, 한 syndrome string에서 (CNOT, Pauli) pair를 식별. 그 frame은 72쌍 충돌이라는 정보이론적 벽에 부딪혔고, 그 충돌은 라운드 수·측정 모드에 invariant. 브랜치 `long-sequence-analysis`는 **sequence-level 통계**로 이 벽을 우회하는 reframing입니다.
+
+### 12.1 문제 재설정 (R1 시나리오)
+
+| 항목 | Single-shot (main) | R1 (이 브랜치) |
+|---|---|---|
+| Fault 발생 | 지정 라운드에 결정론적 1회 | **매 라운드, 매 CNOT** 베르누이 추첨 |
+| CNOT별 발생률 | n/a | 24개 모두 background `p_bg`, 지정된 1개에 **elevated `p_high`** |
+| Event당 Pauli | 고정 pair | **15개 non-identity 2-qubit Pauli 균등 추첨** (II 제외) |
+| 관측 | 단일 syndrome string | `(T, 8)` syndrome stream |
+| 추정 대상 | (CNOT, Pauli) 공동 | **dominant CNOT만** (Pauli는 marginalize) |
+| Decoder | n/a | 인터페이스 분리 — R1은 `IdentityDecoder` (no-op) |
+
+기대: single-round 신드롬이 충돌해도, 서로 다른 dominant CNOT이 만드는 **T-라운드 시퀀스 분포** 는 구별 가능할 수 있고, 그러면 72쌍 ceiling을 깰 수 있음.
+
+### 12.2 새 모듈
+
+| 파일 | 역할 |
+|---|---|
+| `src/decoder.py` | `Decoder` ABC + `Correction` dataclass + `IdentityDecoder`. window decoder (R3b lookup decoder 등) 확장점 |
+| `src/stochastic_faults.py` | `BackgroundElevatedSampler(p_bg, p_high, faulty_cnot_id, rng)` — 매 라운드 매 CNOT 베르누이 + 15-Pauli 균등 추첨 |
+| `src/sequence_runner.py` | `run_sequence(T, sampler, decoder, ...)` — `IdentityDecoder`용 single-QNode fast path. 다른 decoder는 window state hand-off가 추가될 때까지 `NotImplementedError` |
+| `src/sequence_dataset.py` | `generate_r1_dataset(...)` + `save_r1_dataset(...)` — N개 `(T, 8)` syndromes + seed + oracle fault log |
+
+### 12.3 새 스크립트
+
+| 스크립트 | 역할 |
+|---|---|
+| `scripts/generate_r1_sequences.py` | R1 데이터셋 생성 CLI. 출력: `data/r1_sequences/{baseline\|cnotXX}/T{T}_pbg{p}_phigh{p}_seed{s}/{reset\|no_reset}/` |
+| `scripts/sanity_check_r1_infra.py` | 회귀 테스트 — §12.4 참고 |
+
+### 12.4 Sanity check (통과)
+
+새 인프라가 main 브랜치 single-shot 결과를 통제된 케이스에서 비트 단위로 재현함.
+
+- **Test B** — sampler dict 구조: 216 = 24 CNOT × 9 Pauli pair 전부에서, `BackgroundElevatedSampler(p_bg=0, p_high=1, faulty_cnot_id=k)`가 만드는 fault dict의 `(round, control, target, error_wires, error_types)`가 `make_fixed_cnot_fault_schedule` 출력과 일치 (추가 필드 `cnot_id`, `pauli_pair`는 허용).
+- **Test C** — end-to-end syndrome 일치: 24개 CNOT 전부, Pauli=XZ가 T=2 시퀀스의 매 라운드에 발생하는 케이스에서, 결정론화한 sampler를 `run_sequence`에 태워 만든 `(T, 8)` syndromes가 main 브랜치 path (`make_fixed_cnot_fault_schedule` + `make_repeated_stabilizer_qnode`)와 비트 단위 일치. `reset` / `no_reset` 모드 모두 검증. 각 모드에서 **24/24 PASS**.
+
+이걸로 `sampler → fault_schedule format → QNode → reshape` 사슬이 검증됨. Stochastic sampling 자체 (numpy 추첨 분포)는 별도 단위 테스트하지 않음 — Phase 2에서 분포가 이상하면 자동으로 노출.
+
+### 12.5 캐퍼빌리티 요약
+
+추가 코딩 없이 R1 인프라로 지금 할 수 있는 것:
+
+- `(N, T, 8) uint8` 형태 데이터셋 + 결정론적 seed + 샘플별 oracle fault log
+- 노브: `faulty_cnot_id ∈ {None, 0..23}`, `p_bg, p_high ∈ [0,1]`, `T ∈ ℤ⁺`, `reset` / `no_reset`
+- 시나리오: R1 본 실험, baseline (elevated CNOT 없음), forced sampler로 single-shot 결과 재현
+
+확장점: non-Identity decoder path (window state hand-off, `sequence_runner.py:72`), final data-qubit 측정 결합, 다른 Pauli pool, Stim 백엔드, code distance > 3.
+
+### 12.6 다음 step — 디바이스 viability map
+
+`p_bg`, `p_high`는 우리가 고르는 노브가 아니라 **물리 디바이스의 속성** (현재 초전도 2-qubit gate error 약 10⁻³ – 10⁻², 고장난 CNOT은 10⁻² – 10⁻¹). `T`는 coherence time이 상한인 실험 설계 자유도. 그래서 다음 step은 "파라미터를 고른다"가 아니라 **방법의 적용 범위를 측정**:
+
+> `(p_bg, p_high, T)` 격자에서, 매 라운드의 syndrome 분포 (Pauli marginalized) 위의 Bayes-optimal classifier 정답률을 학습 없이 계산. 결과물은 *viability map*:
+> 1. 어떤 디바이스 파라미터 regime에서 식별 task가 유효한가?
+> 2. 목표 정답률을 위해 T는 얼마나 길게 관측해야 하나?
+> 3. main 브랜치의 72-collision 쌍 중 시퀀스로 깨지는 것 vs 시퀀스에서도 살아남는 본질적 한계는?
+
+이 ceiling은 이후 학습 모델의 상한이기도 하므로, 평가 benchmark 역할도 겸함.
