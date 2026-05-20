@@ -467,3 +467,97 @@ $G_1$ (CNOT 6, 7)은 **pool 의존적**: 6개의 single-leg Pauli가 15-Pauli �
 2. **Group accuracy가 의미 있는 지표**. Per-class accuracy는 0.75에서 천장이 막혀 있어 실제 분류기 품질과 구조적 ambiguity를 섞어버림.
 3. **Viability region은 여전히 의미 있음**. (p_bg, p_high, T)에서 group accuracy는 1/18 (random)에서 1.0까지 변함. `(p_bg=1e-2, p_high=1e-1, T≈100)` 전이 구간이 학습 분류기 (Task #6) 평가의 sweet spot.
 4. **세부 파라미터 결정 (Task #2)은 R3b ceiling 알기 전까지 보류**: 만약 R3b가 X-stab 그룹을 깬다면 (p_bg, p_high, T) 관심 영역이 달라짐.
+
+---
+
+## 14. R3b ceiling 결과 (branch `decoder-add-analysis`)
+
+§13.7 에서 열어둔 가설 — "single-round window decoder 를 추가하면 X-stab interior ambiguity 그룹이 깨질 것" — 에 대해 R3b 인프라를 end-to-end 로 구축하고 직접 검증했습니다. 한 줄 요약: **가설의 정성적 부분은 확인 (R3b 의 round-별 marginal 이 그룹 멤버 간 실제로 갈라짐), 단 정량적 주장은 falsified (그럼에도 marginal-Bayes 정확도가 R1 보다 *훨씬 낮음*).**
+
+### 14.1 추가된 인프라
+
+| 파일 | 역할 |
+|---|---|
+| `src/pauli_frame.py` | 17-큐빗 symplectic Pauli frame, in-place CNOT/H/reset update |
+| `src/round_propagation.py` | `stabilizer_round` 와 게이트별로 동일한 symbolic propagator. post-round frame + 예측 ancilla outcome 둘 다 반환 |
+| `src/decoder.py` `LookupDecoder` | window=1 decoder. 24×15 single-fault syndrome 의 역 lookup + residual 적용. tie-break = lex-min (k, α). multi-fault 라운드 → identity |
+| `src/sequence_runner.py` window path | 매 라운드 1-round QNode 호출, `initial_error_list` 로 carried frame 주입. IdentityDecoder 의 경우 fast path 와 syndrome 완전 일치 (regression check) |
+| `src/fast_simulator.py` `run_sequence_symbolic` | `run_sequence` 의 drop-in 대체. propagator 만 사용. ~100× faster, bit-identical (18/18 cases) |
+| `src/ceiling_r3b.py` | MC marginal-Bayes ceiling estimator |
+| `scripts/sanity_check_round_propagation.py` | PL vs symbolic single-round lookup (360/360), data-Pauli 보존 (27/27), 2-round end-to-end (360/360) |
+| `scripts/sanity_check_fast_simulator.py` | PL vs symbolic full-sequence (18 cases) + benchmark |
+| `scripts/sanity_check_r3b_runner.py` | fast vs window IdentityDecoder 동일성, LookupDecoder smoke, LookupDecoder ≠ IdentityDecoder |
+| `scripts/compute_r3b_ceiling.py` | `(p_bg, p_high, T)` grid sweep, R1 (analytic) + R3b (MC) 둘 다 |
+| `scripts/analyze_r3b_ceiling.py` | 그룹별 per-class accuracy, within-group spread, R3b marginal 들 사이 pairwise JS divergence |
+
+R3b decoder 의 정확한 spec 은 [docs/r3b_design.md](docs/r3b_design.md).
+
+### 14.2 측정 방법
+
+각 candidate dominant CNOT k ∈ {0..23} 에 대해 `n_train` 개의 symbolic 시퀀스 (T 라운드) 를 `LookupDecoder` 와 함께 시뮬레이션. round 0 은 항상 frame=0 에서 시작하므로 decoder 와 무관 → 분석에서 제외. round 1+ 의 detection event 를 모아서 marginal P(d | k) 를 (Laplace smoothing 적용) histogram 으로 추정. Marginal Bayes 분류기
+
+\[\hat{k} = \arg\max_k \sum_{t \ge 1} \log P(d_t | k)\]
+
+를 독립 샘플 `n_test` 개에 적용. confusion matrix 로부터 per-class 정확도, group 정확도 (R1 ambiguity 그룹 정의 사용), marginal 들 사이 JS divergence 계산.
+
+### 14.3 핵심 수치
+
+`(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 50`–`200`, seed 0 기준 (자료: `data/analysis/7_r3b_ceiling/`):
+
+| T | R1 per-class (analytic) | R3b per-class (MC) | R1 group | R3b group |
+|---|---|---|---|---|
+| 10 | 0.18 | 0.11 | 0.24 | 0.15 |
+| 30 | 0.31 | 0.09 | 0.40 | 0.12 |
+| 50 | 0.41 | 0.10 | 0.53 | 0.13 |
+
+R1 은 T 가 커질수록 향상, R3b 는 약 0.1 에서 평탄. Group 정확도도 같은 양상.
+
+### 14.4 정성적 확인 — marginal 은 갈라짐
+
+T=50, R3b 의 그룹 멤버들 사이 pairwise JS divergence (per-round marginal 기준):
+
+| 그룹 | 평균 pairwise JS | 최댓값 pairwise JS |
+|---|---|---|
+| {6, 7} | 0.065 | 0.065 |
+| {14, 15, 17} | 0.062 | 0.068 |
+| {18, 19, 20} | 0.067 | 0.075 |
+| {22, 23} | 0.066 | 0.066 |
+
+R1 에선 이 값들이 정의상 정확히 0 (multiset 자체가 같으므로). R3b 는 marginal-level 의 equivalence 는 명백히 깨뜨림 — §13.7 이 예측한 메커니즘이 실제로 작동.
+
+### 14.5 그런데 왜 R3b 가 더 나쁜가 — 잘못된 correction 의 노이즈 주입
+
+Marginal 이 갈라졌음에도 R3b 분류 정확도는 R1 보다 훨씬 낮음. 원인은 lex-min single-fault decoder 자체의 작동 방식:
+
+- 0 이 아닌 single-fault syndrome 하나가 **평균 9개의 (k, α) preimage** 를 가짐 (cross-CNOT syndrome collision 이 광범위).
+- Decoder 는 그 syndrome 을 볼 때마다 lex-min (k, α) 를 골라 commit — true (k, α) 와는 거의 항상 다름.
+- 잘못된 correction 이 데이터 큐빗 frame 에 거의 random 한 Pauli residual 을 누적.
+- R1 이 "background noise 위의 느린 systematic bias" 로 천천히 모으던 dominant-CNOT signal 이 이 random 한 correction 들로 흩어짐.
+
+R3b 의 within-group per-class 정확도 표준편차는 T=50 에서 모든 4개 그룹 ≤ 0.05 (균일하게 낮음). R1 에선 lex-min 매칭이 한 멤버를 특히 favor 해서 std 가 크지만, R3b 에선 그 favoring 효과가 깨지고 **모든 멤버가 골고루 낮음**.
+
+### 14.6 §13.7 가설에 대한 판결
+
+| 주장 | 결과 |
+|---|---|
+| "Decoder 가 모호한 두 history 에 같은 correction 을 적용하므로, 실제 residual 들이 후속 라운드의 syndrome 에 다르게 전파된다." | ✅ 확인 (JS > 0). |
+| "그러므로 R3b 분류기가 ambiguity 그룹 멤버들을 구별할 수 있고 0.75 R1 ceiling 을 넘는다." | ❌ 이 decoder 한정으로 falsified. R3b 는 ≈ 0.10. |
+
+차이는 작은 상수가 아니라 *order of magnitude*. 원인은 decoder 의 lex-min commit 정책 (window 크기나 propagator 정확성이 아니라).
+
+### 14.7 X-stab interior 그룹을 실제로 깨려면
+
+기대 효과 순서대로:
+
+1. **Posterior-aware decoder**. lex-min 대신 `(p_bg, p_high)` prior 로 `(k, α)` posterior 를 계산해서 Bayes-averaged correction 또는 posterior sampling. Frame 에 가해지는 perturbation 의 평균 strength 가 낮아질 것.
+2. **Multi-round window**. window > 1 이면 decoder 가 syndromes 여러 개를 보고 결정 → arbitrary tie-break 없이 single-fault hypothesis 가 disambiguate 될 수 있음.
+3. **Full-sequence ML decoder**. Syndrome stream 자체를 관측으로 보고 dominant-CNOT 분류기를 직접 학습. Decoder choice 를 marginalize. R3 시나리오의 가장 강한 형태. 다음 실험 자연스러운 후보.
+4. **Pauli pool 제한**. §13.6 에서 single-leg Pauli 6개를 빼면 (15→9) R1 의 G₁ = {6,7} 그룹이 깨지듯, R3b 의 marginal sharpening 에도 비슷한 효과 가능. 비용 작음.
+
+### 14.8 프로젝트적 의미
+
+- Task #7 ("R3b decoder") 는 window-1 lex-min decoder 에 대한 가설 검증으로 **완료**.
+- 시퀀스 레벨 CNOT 식별의 headline ceiling 은 여전히 **R1 의 18/24 group 정확도** (또는 9-Pauli 일 경우 19/24).
+- Task #5 (데이터셋), Task #6 (분류기) 둘 다 unblock. Classifier 평가 기준점은 여전히 R1 의 per-round marginal Bayes. R3b 는 reference 가 아니라 cautionary example.
+- 구조적 그룹을 실제로 깨려면 §14.7 의 1~3 중 하나. 모두 이번에 만든 인프라로 trackable.
+

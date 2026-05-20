@@ -470,3 +470,97 @@ Concretely for $G_3 = \{18, 19, 20\}$: a fault at CNOT 18 leaves residual on dat
 2. **Group accuracy is the operationally meaningful metric.** Per-class accuracy is capped at 0.75 by construction and conflates real classifier quality with structural ambiguity.
 3. **Viability region is still meaningful.** Within (p_bg, p_high, T), group accuracy ranges from 1/18 (random) to 1.0. The transition region around `(p_bg=1e-2, p_high=1e-1, T≈100)` is the sweet spot for evaluating learned classifiers (Task #6).
 4. **Defer detailed parameter selection (Task #2)** until R3b ceiling is known: if R3b breaks the X-stab groups, the (p_bg, p_high, T) region of interest shifts.
+
+---
+
+## 14. R3b ceiling result (branch `decoder-add-analysis`)
+
+Section 13 left the §13.7 conjecture open: would adding a single-round window decoder break the X-stab interior ambiguity groups? Branch `decoder-add-analysis` builds the R3b infrastructure end-to-end and answers it. The summary up front: **the qualitative half of the conjecture is confirmed (per-round marginals diverge between group members under R3b), but the quantitative claim is falsified (the resulting marginal-Bayes accuracy is markedly worse than R1's, not better).**
+
+### 14.1 Infrastructure added
+
+| File | Role |
+|---|---|
+| `src/pauli_frame.py` | 17-qubit symplectic Pauli frame with in-place CNOT/H/reset updates |
+| `src/round_propagation.py` | Symbolic round propagator that mirrors `stabilizer_round` gate-for-gate; produces both the post-round frame and the predicted ancilla outcomes |
+| `src/decoder.py` `LookupDecoder` | window-size-1 decoder built from the 24×15 single-fault syndrome and residual lookups; lex-min `(k, α)` tie-break; multi-fault rounds → identity |
+| `src/sequence_runner.py` window path | per-round 1-round QNode call with `initial_error_list` seeded from the carried Pauli frame; reproduces fast-path syndromes when run with IdentityDecoder (regression-tested) |
+| `src/fast_simulator.py` `run_sequence_symbolic` | drop-in for `run_sequence` that uses the propagator only — ~100× faster, bit-identical (verified 18/18 cases) |
+| `src/ceiling_r3b.py` | MC marginal-Bayes ceiling estimator |
+| `scripts/sanity_check_round_propagation.py` | PL vs symbolic single-round lookup (360/360), data-Pauli preservation (27/27), 2-round end-to-end (360/360) |
+| `scripts/sanity_check_fast_simulator.py` | PL vs symbolic full-sequence (9 + 9 cases) + benchmark |
+| `scripts/sanity_check_r3b_runner.py` | fast vs window IdentityDecoder equality; LookupDecoder smoke; LookupDecoder ≠ IdentityDecoder |
+| `scripts/compute_r3b_ceiling.py` | `(p_bg, p_high, T)` grid sweep with both R1 (analytic) and R3b (MC) classifiers |
+| `scripts/analyze_r3b_ceiling.py` | per-class accuracy by group, within-group spread, pairwise JS divergence between R3b marginals |
+
+The R3b decoder's spec is pinned in [docs/r3b_design.md](docs/r3b_design.md).
+
+### 14.2 What we computed
+
+For each candidate dominant CNOT k ∈ {0..23}, we ran `n_train` symbolic sequences of length T with `LookupDecoder` engaged, dropped round 0 (decoder-agnostic since the frame is always 0 there), and estimated the per-round marginal P(d | k) by histogram (Laplace-smoothed). The marginal Bayes classifier
+
+\[\hat{k} = \arg\max_k \sum_{t \ge 1} \log P(d_t | k)\]
+
+was then applied to `n_test` independently sampled test sequences for each true k*. The resulting confusion matrix gives per-class accuracy, group accuracy (using the R1 ambiguity groups), and per-pair JS divergence between marginals.
+
+### 14.3 Headline numbers
+
+At `(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 50`–`200`, seed 0 (data: `data/analysis/7_r3b_ceiling/`):
+
+| T | R1 per-class (analytic) | R3b per-class (MC) | R1 group | R3b group |
+|---|---|---|---|---|
+| 10 | 0.18 | 0.11 | 0.24 | 0.15 |
+| 30 | 0.31 | 0.09 | 0.40 | 0.12 |
+| 50 | 0.41 | 0.10 | 0.53 | 0.13 |
+
+R3b plateaus near 0.1 while R1 keeps improving with T. Group accuracy tells the same story.
+
+### 14.4 Qualitative confirmation: marginals do diverge
+
+For the R1 ambiguity groups under R3b at T=50, the pairwise Jensen-Shannon divergence of per-round marginals between group members is non-zero:
+
+| Group | mean pairwise JS | max pairwise JS |
+|---|---|---|
+| {6, 7} | 0.065 | 0.065 |
+| {14, 15, 17} | 0.062 | 0.068 |
+| {18, 19, 20} | 0.067 | 0.075 |
+| {22, 23} | 0.066 | 0.066 |
+
+Under R1 these divergences are exactly 0 by construction (the multisets coincide). R3b does break the per-round-marginal equivalence, which is the §13.7 mechanism. So the *directional* claim is correct: the decoder leaks group-distinguishing information into subsequent rounds' marginals.
+
+### 14.5 Why R3b loses overall: wrong-correction noise injection
+
+Despite the marginals diverging, the R3b classifier underperforms R1 by a wide margin. The cause is the lex-min single-fault decoder itself:
+
+- Every non-zero single-fault syndrome admits **~9 distinct (k, α) preimages** in the 24×15 lookup (cross-CNOT syndrome collisions are pervasive).
+- The decoder commits to the lex-min preimage every time it sees that syndrome, regardless of the true (k, α). On nearly every round, the picked residual differs from the true residual.
+- Applying that wrong correction injects a near-random Pauli residual into the data-qubit frame entering the next round.
+- The dominant-CNOT signal — which R1 was patiently accumulating as a slow systematic bias on top of background noise — is effectively scrambled by these random corrections.
+
+The within-group standard deviation of R3b's per-class accuracy is uniformly low (≤ 0.05 at T=50 across all four groups), in contrast to R1's high spread (driven by the lex-min favoring one specific member of each ambiguous syndrome). R3b makes all group members **equally bad** rather than rescuing the disfavored ones.
+
+### 14.6 Verdict on the §13.7 hypothesis
+
+| Claim | Status |
+|---|---|
+| "The decoder, by applying the same correction to two ambiguous histories, lets the *true* residuals propagate differently into subsequent rounds." | ✅ Confirmed (JS > 0). |
+| "Therefore the R3b classifier can distinguish ambiguity-group members and exceed the 0.75 R1 ceiling." | ❌ Falsified for this particular decoder. R3b sits at ≈ 0.10. |
+
+The gap is not a small constant — it's an order of magnitude. We attribute the gap to the decoder's lex-min commitment policy, not to the window-size choice or the propagator's correctness (both validated independently).
+
+### 14.7 What would actually break the X-stab interior groups
+
+Things to try, in roughly decreasing order of expected payoff:
+
+1. **Posterior-aware decoder.** Instead of lex-min, use the `(p_bg, p_high)` prior to compute a soft posterior over `(k, α)` and either Bayes-average the correction or sample from the posterior. The mean residual becomes a less aggressive perturbation of the frame.
+2. **Multi-round window.** With window > 1, the decoder sees several syndromes before committing, which can disambiguate single-fault hypotheses without an arbitrary tie-break.
+3. **Full-sequence ML decoder.** Treat the syndrome stream itself as the observation and train the dominant-CNOT classifier directly, with the decoder marginalized over its choices. This is the R3 scenario in its strongest form and is the natural next experimental target.
+4. **Restrict the Pauli pool.** As in R1 §13.6, dropping the 6 single-leg Paulis (15-Pauli → 9-Pauli) collapses one R1 group (G₁ = {6,7}); a similar restriction may sharpen R3b's marginals for the same reason. Cheap experiment.
+
+### 14.8 What this means for the project
+
+- Task #7 ("R3b decoder") is **complete** as a hypothesis test for the window-1 lex-min decoder.
+- The headline ceiling for sequence-level CNOT identification under physically realistic background noise remains the **R1 ceiling, 18/24 group accuracy** (or 19/24 with 9-Pauli).
+- Tasks #5 (dataset) and #6 (classifier) are unblocked. The classifier evaluation benchmark is still R1's per-round marginal Bayes accuracy; R3b is a cautionary example rather than a target.
+- The path to actually breaking the structural groups is some combination of a smarter decoder (item 14.7-1 or -2) or a full-sequence classifier (-3). All three are tractable in the same infrastructure built here.
+
