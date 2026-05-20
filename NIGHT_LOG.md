@@ -43,13 +43,15 @@ Deliverables:
 
 - [x] 1단계 — 컨텍스트 흡수: README §12–§13, `src/ceiling.py`, `src/decoder.py`, `src/sequence_runner.py`, `src/simulator.py`, `src/stabilizer_circuit.py` 정독 (`296e895`)
 - [x] 2단계 — R3b design 노트 (`docs/r3b_design.md`)
-- [ ] 3단계 — `LookupDecoder` 구현 + 단위 테스트
-- [ ] 4단계 — `sequence_runner` window-by-window 경로 구현
-- [ ] 5단계 — R3b sanity check (end-to-end)
-- [ ] 6단계 — R3b ceiling 계산
-- [ ] 7단계 — 가설 검증 분석 + plot
-- [ ] 8단계 — README §14 + HANDOFF 업데이트
-- [ ] 9단계 (옵션) — 작은 데이터셋 + histogram MLE baseline
+- [x] 3a — `src/pauli_frame.py` symplectic representation (`2c242f1`)
+- [x] 3b — `src/round_propagation.py` + sanity check (`7d33c84`)
+- [x] 3c — `src/decoder.py` `LookupDecoder` (`b7d8117`)
+- [x] 3d — `src/sequence_runner.py` window-by-window 경로 (`1761603`)
+- [x] 3e — R3b runner smoke test (smoke + observation 기록)
+- [ ] 4단계 — R3b ceiling 계산 (3단계의 의도된 5/6단계 합쳐서 진행)
+- [ ] 5단계 — 가설 검증 분석 + plot
+- [ ] 6단계 — README §14 + HANDOFF 업데이트
+- [ ] 7단계 (옵션) — 작은 데이터셋 + histogram MLE baseline
 
 ## 5. 진행 로그 (append-only)
 
