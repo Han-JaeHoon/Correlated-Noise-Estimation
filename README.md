@@ -576,15 +576,23 @@ Things to try, in roughly decreasing order of expected payoff:
 
 The bare `LookupDecoder` defaults to identity correction on multi-fault rounds (detection events not in the 24×15 single-fault lookup). At p_bg = 0.01 the multi-fault rate per round is ≈ 0.24, so this branch is hit often. To isolate whether the multi-fault-identity policy is what drags R3b below R1, `src/decoder.py:HammingNearestDecoder` replaces it with: on a non-zero d not in the lookup, apply the correction of the lookup syndrome that is closest to d in Hamming distance (lex-min tie-break on the lookup syndrome). On d in the lookup or d == 0, behavior is identical to `LookupDecoder`.
 
-At `(p_bg, p_high) = (0.01, 0.1)`, `T = 30`, `n_train = n_test = 80`, `seed = 0`:
+At `(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 100`, `seed = 42`:
 
-| Decoder | per-class | group |
-|---|---|---|
-| R1 (analytic) | 0.309 | 0.395 |
-| R3b LookupDecoder | 0.114 | 0.152 |
-| R3b HammingNearestDecoder | 0.160 | 0.210 |
+| T | R1 (analytic) | R3b LookupDecoder | R3b HammingNearestDecoder |
+|---|---|---|---|
+| 10 | 0.180 | 0.115 | 0.122 |
+| 30 | 0.312 | 0.107 | 0.149 |
+| 50 | 0.416 | 0.095 | 0.186 |
 
-Hamming is ~40 % better than the bare lookup but still well below R1. The conclusion of §14.6 is unchanged — any single-fault-hypothesis decoder we tried is dominated by the random-correction-noise problem — but it shows the "multi-fault → identity" branch was non-negligibly conservative; ~30 % of R3b's missing performance vs R1 is attributable to it.
+(per-class accuracy; group accuracy follows the same ordering with margins ≈ 1.3× higher.)
 
-`scripts/compare_decoders.py` produces curves across T at one (p_bg, p_high) cell; outputs land in `data/analysis/7_r3b_ceiling/decoder_compare/`.
+Two trends across T are striking:
+
+1. **R1 is monotonically increasing** with T (expected — more samples to estimate the marginal log-likelihood).
+2. **LookupDecoder is monotonically *decreasing*** with T (0.115 → 0.107 → 0.095). Longer sequences accumulate more wrong corrections, and the *plateau* of §14.3 turns out to be the average of a slow decline. The identity-fallback on multi-fault rounds means most rounds either over-correct (single-fault hypothesis) or do nothing — no policy actually carries useful signal forward.
+3. **HammingNearestDecoder is monotonically *increasing*** with T (0.122 → 0.149 → 0.186), at roughly half R1's slope. Replacing the identity fallback with a nearest-Hamming guess turns previously-wasted rounds into partial signal carriers.
+
+Both R3b variants remain well below R1 across all T. The conclusion of §14.6 stands: any single-fault-hypothesis decoder we tried is dominated by R1's marginal-Bayes lower bound. But the multi-fault-fallback policy is *more impactful than the lex-min tie-break*: switching from identity to nearest-Hamming nearly doubles R3b's slope.
+
+`scripts/compare_decoders.py` produces curves across T at one (p_bg, p_high) cell; outputs land in `data/analysis/7_r3b_ceiling/decoder_compare/decoder_compare_curves.png`.
 

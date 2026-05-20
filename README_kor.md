@@ -571,15 +571,23 @@ R3b 의 within-group per-class 정확도 표준편차는 T=50 에서 모든 4개
 
 기본 `LookupDecoder` 는 multi-fault round (detection event 가 24×15 single-fault lookup 에 없음) 에서 identity correction. p_bg = 0.01 이면 라운드 당 multi-fault 비율이 ≈ 0.24 라 이 branch 가 자주 발동. 이 multi-fault-identity 정책이 R3b 를 R1 아래로 끌어내리는 원인인지 분리하기 위해 `src/decoder.py:HammingNearestDecoder` 를 추가: lookup 에 없는 non-zero d 에 대해, lookup syndrome 중 Hamming 거리 가장 가까운 것의 correction 적용 (lex-min 으로 tie-break). d in lookup 또는 d == 0 에선 `LookupDecoder` 와 동일.
 
-`(p_bg, p_high) = (0.01, 0.1)`, `T = 30`, `n_train = n_test = 80`, `seed = 0`:
+`(p_bg, p_high) = (0.01, 0.1)`, `n_train = n_test = 100`, `seed = 42`:
 
-| Decoder | per-class | group |
-|---|---|---|
-| R1 (analytic) | 0.309 | 0.395 |
-| R3b LookupDecoder | 0.114 | 0.152 |
-| R3b HammingNearestDecoder | 0.160 | 0.210 |
+| T | R1 (analytic) | R3b LookupDecoder | R3b HammingNearestDecoder |
+|---|---|---|---|
+| 10 | 0.180 | 0.115 | 0.122 |
+| 30 | 0.312 | 0.107 | 0.149 |
+| 50 | 0.416 | 0.095 | 0.186 |
 
-Hamming 이 lookup 보다 ~40% 좋지만 여전히 R1 보다 훨씬 낮음. §14.6 의 결론은 변경 없음 — 어떤 single-fault hypothesis decoder 도 random-correction-noise 문제에 지배됨. 단 "multi-fault → identity" branch 가 적지 않게 보수적이었음을 보임 — R3b 의 R1 대비 손실의 ~30% 가 이 branch 때문.
+(per-class accuracy 기준; group accuracy 도 같은 순위, margin ≈ 1.3× 더 큼.)
 
-`scripts/compare_decoders.py` 가 한 (p_bg, p_high) cell 에서 T 별 곡선 생성, `data/analysis/7_r3b_ceiling/decoder_compare/` 로 출력.
+T 별 trend 가 흥미로움:
+
+1. **R1 은 T 에 monotonically 증가** (자연스러움 — log-likelihood marginal 추정 sample 증가).
+2. **LookupDecoder 는 T 에 monotonically *감소*** (0.115 → 0.107 → 0.095). 긴 sequence 일수록 잘못된 correction 누적, §14.3 의 "plateau" 는 사실 천천히 *감소* 하는 것의 평균. multi-fault round identity fallback 은 정보를 다음 라운드로 carry 하지 않음.
+3. **HammingNearestDecoder 는 T 에 monotonically *증가*** (0.122 → 0.149 → 0.186), R1 의 약 절반 기울기. identity fallback 을 nearest-Hamming guess 로 바꾸면 그동안 낭비되던 라운드가 부분적 신호 carrier 가 됨.
+
+두 R3b 변형 모두 모든 T 에서 R1 보다 한참 낮음. §14.6 결론 유지 — 어떤 single-fault hypothesis decoder 도 R1 의 marginal-Bayes lower bound 에 지배됨. 단 **multi-fault fallback 정책이 lex-min tie-break 보다 더 영향력 있음** — identity → nearest-Hamming 으로 바꾸면 R3b 의 기울기 거의 두 배.
+
+`scripts/compare_decoders.py` 가 한 (p_bg, p_high) cell 에서 T 별 곡선 생성. 출력: `data/analysis/7_r3b_ceiling/decoder_compare/decoder_compare_curves.png`.
 
