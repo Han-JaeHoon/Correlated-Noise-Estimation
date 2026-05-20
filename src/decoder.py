@@ -89,3 +89,77 @@ class IdentityDecoder(Decoder):
 
     def decode_window(self, detection_events: np.ndarray) -> Correction:
         return Correction.identity(self._n)
+
+
+class LookupDecoder(Decoder):
+    """
+    Single-round-window lookup decoder for the R3b scenario.
+
+    Built once from the symbolic single-fault lookups:
+      - syndrome lookup:  (CNOT k, Pauli α) → 8-bit syndrome σ_{k,α}
+      - residual lookup:  (k, α) → data-qubit Pauli residual at round end.
+
+    At each round, the decoder is handed a single round's detection event d.
+    It picks the lex-minimum (k, α) consistent with d and returns the
+    matching residual as a Correction (applying it cancels the residual under
+    the single-fault hypothesis).
+
+    Defaults follow `docs/r3b_design.md`:
+      - window_size = 1
+      - tie-break = lex min (k, α)
+      - d == 0 → identity
+      - d ∈ no lookup match (multi-fault round) → identity (conservative)
+    """
+
+    def __init__(self, reset: bool = True, n: int = n_data):
+        from collections import defaultdict
+        from .round_propagation import (
+            build_single_fault_residual_lookup,
+            build_single_fault_syndrome_lookup,
+        )
+
+        self._n = int(n)
+        self._reset = bool(reset)
+
+        syn_lookup = build_single_fault_syndrome_lookup(reset=reset)
+        res_lookup = build_single_fault_residual_lookup(reset=reset)
+
+        inverse = defaultdict(list)
+        n_cnot, n_pauli = syn_lookup.shape
+        for k in range(n_cnot):
+            for alpha in range(n_pauli):
+                s = int(syn_lookup[k, alpha])
+                inverse[s].append((k, alpha))
+        # tie-break: lex min (k, α) per syndrome
+        self._lex_min = {s: min(v) for s, v in inverse.items()}
+        self._all_matches = {s: sorted(v) for s, v in inverse.items()}
+        self._residuals = res_lookup
+        self._syn_lookup = syn_lookup
+
+    @property
+    def window_size(self) -> int:
+        return 1
+
+    @property
+    def residuals(self) -> np.ndarray:
+        """(24, 15, 2, 9) uint8 — exposed for diagnostics / tests."""
+        return self._residuals
+
+    @property
+    def syndrome_lookup(self) -> np.ndarray:
+        """(24, 15) int — exposed for diagnostics / tests."""
+        return self._syn_lookup
+
+    def decode_window(self, detection_events: np.ndarray) -> Correction:
+        d = np.asarray(detection_events[0], dtype=np.int64).reshape(-1)
+        if d.size != 8:
+            raise ValueError(f"LookupDecoder expects 8-bit detection event, got size {d.size}")
+        s = int(np.dot(d, 1 << np.arange(d.size)))
+
+        if s == 0 or s not in self._lex_min:
+            return Correction.identity(self._n)
+
+        k, alpha = self._lex_min[s]
+        x_corr = self._residuals[k, alpha, 0].copy()
+        z_corr = self._residuals[k, alpha, 1].copy()
+        return Correction(x_correction=x_corr, z_correction=z_corr)
