@@ -23,7 +23,7 @@ Deliverables:
 
 ## 2. 시작 시각 / 환경
 
-- **Start (UTC)**: 채워질 예정
+- **Start (UTC)**: 2026-05-20 16:52
 - **Branch**: `decoder-add-analysis` (분기점: `701680f`)
 - **모델**: Opus 4.7 (1M context)
 
@@ -41,8 +41,8 @@ Deliverables:
 
 ## 4. Plan checklist
 
-- [ ] 1단계 — 컨텍스트 흡수: README §12–§13, `src/ceiling.py`, `src/decoder.py` 정독
-- [ ] 2단계 — R3b design 노트 (`docs/r3b_design.md`)
+- [x] 1단계 — 컨텍스트 흡수: README §12–§13, `src/ceiling.py`, `src/decoder.py`, `src/sequence_runner.py`, `src/simulator.py`, `src/stabilizer_circuit.py` 정독 (`296e895`)
+- [x] 2단계 — R3b design 노트 (`docs/r3b_design.md`)
 - [ ] 3단계 — `LookupDecoder` 구현 + 단위 테스트
 - [ ] 4단계 — `sequence_runner` window-by-window 경로 구현
 - [ ] 5단계 — R3b sanity check (end-to-end)
@@ -55,8 +55,37 @@ Deliverables:
 
 > 매 단계 시작/완료, 결정, 발견, blocker 를 timestamp 와 함께 누적.
 
-### 5.0 (시작)
-- NIGHT_LOG.md 생성. 첫 commit + push.
+### 5.0 (시작) — 2026-05-20 16:52 UTC
+- NIGHT_LOG.md 생성. 첫 commit + push (`296e895`).
+
+### 5.1 컨텍스트 흡수 — ~17:00 UTC
+정독 파일: `HANDOFF.md`, `README.md §12–§13`, `src/ceiling.py`, `src/decoder.py`,
+`src/sequence_runner.py`, `src/simulator.py`, `src/stabilizer_circuit.py`.
+
+핵심 발견:
+1. **회로 게이트 순서 명확** — Z stabs (4개, 각 Z stab 안에서 data→anc CNOT 순회)
+   → X stabs (4개, 각 X stab 은 H + anc→data CNOTs + H) → ancilla measure(reset).
+   순서: `[Z0, Z1, Z2, Z3, X0, X1, X2, X3]`. Fault 는 특정 CNOT 직후에 inject.
+2. **회로에 Pauli frame 주입 가능** — `make_repeated_stabilizer_qnode` 가 이미
+   `initial_error_list / initial_error_wires` 인자를 받음. 매 라운드 새 1-round QNode
+   를 호출하면서 누적 frame 을 주입하는 패턴이 가능.
+3. **R3b 구현 핵심 challenge** — round 사이에 데이터 큐빗 Pauli frame 을 우리가
+   직접 추적해야 함 (PennyLane 의 statevector 는 매 QNode 호출에서 폐기됨).
+   라운드 안에서 일어난 fault 가 *그 후의 CNOT 들을 통해* 다른 데이터 큐빗으로
+   propagate 한 결과까지 손으로 계산 필요. 이건 결정론적, 한 번 구현하면 정확.
+4. **R1 lookup 재사용 가능** — `src/ceiling.py:compute_single_round_lookup` 가
+   이미 24×15 single-fault syndrome lookup 을 만듦. R3b decoder 가 거꾸로
+   syndrome → (cnot, pauli, residual) 매핑에 그대로 활용 가능.
+
+### 5.2 R3b design 노트 — ~17:10 UTC
+`docs/r3b_design.md` 작성. 핵심 spec:
+- Window size = 1 (가설에 가장 직접 + 단순)
+- LookupDecoder: 24×15 single-fault syndrome 의 역 매핑. d → (k,α,residual) 후보.
+- Tie-break: lexicographic min (k,α) — deterministic.
+- Multi-fault round → identity correction (보수적, 후속 라운드에 정보 누적 위임).
+- Pauli frame propagation: 17-qubit symplectic vector, 게이트 in-place 업데이트.
+- Round-by-round runner: 매 라운드 1-round QNode, 누적 frame 을 `initial_error_list`
+  로 주입. 결과: 새 frame = 이전 frame ⊕ (이 라운드 faults' residuals) ⊕ correction.
 
 ## 6. 결정 기록 (이유와 함께)
 
