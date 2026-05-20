@@ -184,8 +184,10 @@ class HammingNearestDecoder(LookupDecoder):
 
     def __init__(self, reset: bool = True, n: int = n_data):
         super().__init__(reset=reset, n=n)
-        # Pre-compute lex-min syndrome list once (in lookup order)
-        self._lookup_syndromes_sorted = sorted(self._lex_min.keys())
+        # Pre-compute lookup syndromes as a vectorized array for fast
+        # Hamming-distance search.
+        sorted_syns = sorted(self._lex_min.keys())  # ascending int → lex tie-break
+        self._lookup_syn_arr = np.array(sorted_syns, dtype=np.uint8)
 
     def decode_window(self, detection_events: np.ndarray) -> Correction:
         d = np.asarray(detection_events[0], dtype=np.int64).reshape(-1)
@@ -199,16 +201,12 @@ class HammingNearestDecoder(LookupDecoder):
         if s in self._lex_min:
             k, alpha = self._lex_min[s]
         else:
-            # find nearest lookup syndrome by Hamming distance, with lex-min
-            # syndrome int as a second-key tie-break for determinism
-            best_dist = 9
-            best_s = None
-            for cand in self._lookup_syndromes_sorted:
-                d_h = bin(cand ^ s).count("1")
-                if d_h < best_dist or (d_h == best_dist and best_s is None):
-                    best_dist = d_h
-                    best_s = cand
-            assert best_s is not None
+            # Vectorized nearest-Hamming search over the lookup syndromes.
+            # Tie-break: smallest int (sorted ascending so first argmin wins).
+            xor = self._lookup_syn_arr ^ np.uint8(s)
+            dists = np.unpackbits(xor[:, None], axis=1).sum(axis=1)
+            best_idx = int(dists.argmin())
+            best_s = int(self._lookup_syn_arr[best_idx])
             k, alpha = self._lex_min[best_s]
 
         x_corr = self._residuals[k, alpha, 0].copy()
