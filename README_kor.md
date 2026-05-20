@@ -379,3 +379,89 @@ python scripts/analyze_cross_pauli_cross_cnot_pairs.py --n-rounds 2 --error-roun
 > 3. main 브랜치의 72-collision 쌍 중 시퀀스로 깨지는 것 vs 시퀀스에서도 살아남는 본질적 한계는?
 
 이 ceiling은 이후 학습 모델의 상한이기도 하므로, 평가 benchmark 역할도 겸함.
+
+---
+
+## 13. R1 ceiling 결과 (Phase 2 — Task #3)
+
+### 13.1 계산한 내용
+
+각 후보 dominant CNOT k에 대해, 한 라운드의 detection event 분포
+
+$$P_k(s) = \left(\bigast_{i \neq k} D_i^{(p_{bg})}\right) \ast D_k^{(p_{high})}, \quad s \in \mathbb{F}_2^8$$
+
+를 24개 CNOT의 독립 contribution 분포의 XOR-convolution으로 계산. 각 $D_i^{(p)}$는 "확률 $1-p$로 syndrome 0, 확률 $p/|\text{Pauli pool}|$로 각 lookup syndrome". Reset 모드에서 detection event는 라운드별 i.i.d.이므로 T-라운드 Bayes-optimal classifier는 $\hat{k} = \arg\max_k \sum_t \log P_k(d_t)$. 정확도는 (p_bg, p_high, T) 격자 위에서 Monte Carlo로 측정.
+
+서브태스크 스크립트:
+- `src/ceiling.py` — lookup 빌더, XOR-convolution, Bayes classifier
+- `scripts/compute_r1_ceiling.py` — (p_bg, p_high, T) sweep + 시각화
+- `scripts/analyze_ceiling_groups.py` — 구조적 ambiguity 그룹 분석 + 15-Pauli vs 9-Pauli 비교
+
+### 13.2 핵심 발견 — 4개의 구조적 ambiguity 그룹
+
+두 dominant 가설 $k, k'$의 per-round 분포가 동일 ⟺ 두 CNOT의 **single-fault syndrome multiset** $\{\sigma_{k,\alpha}\}_\alpha$와 $\{\sigma_{k',\alpha}\}_\alpha$가 $\mathbb{F}_2^8$ 위 multiset으로서 동일. lookup으로 직접 확인:
+
+| 그룹 | 멤버 | Stabilizer | Multiset (15-Pauli) |
+|---|---|---|---|
+| $G_1$ | CNOT 6, 7 | Z2 stab (data → ancilla) | $\{0^3, 4^4, 64^4, 68^4\}$ |
+| $G_2$ | CNOT 14, 15, 17 | X1 stab 내부 (ancilla → data) | $\{0^7, 32^8\}$ |
+| $G_3$ | CNOT 18, 19, 20 | X2 stab 내부 | $\{0^7, 64^8\}$ |
+| $G_4$ | CNOT 22, 23 | X3 stab | $\{0^7, 128^8\}$ |
+
+총 식별 가능 그룹 수 = 24 − (2+3+3+2) + 4 = **18**. Per-class accuracy 점근 한계 = $18/24 = 0.750$. Group-level 식별은 극한에서 1.0.
+
+### 13.3 검증 — 큰 T에서 Monte Carlo
+
+$(p_{bg}, p_{high}) = (0.01, 0.3)$ 에서:
+
+| T | per-class acc | group acc |
+|---|---|---|
+| 10 | 0.42 | 0.56 |
+| 100 | 0.747 | 0.996 |
+| 300 | 0.749 | 1.000 |
+| 1000 | 0.751 | 1.000 |
+
+→ per-class는 18/24에서 정확히 saturate, group accuracy는 1.0에 수렴. Ambiguity 그룹 내부에서 Bayes-optimal classifier는 한 대표 멤버를 결정론적으로 예측 → 나머지 멤버는 0% accuracy.
+
+### 13.4 Per-Pauli vs multiset — 정확한 주장 범위
+
+같은 그룹의 두 CNOT이 **모든 Pauli에 대해 같은 syndrome을 내는 것은 아님**. CNOT 6 vs 7의 경우 15개 Pauli 중 7개는 같은 syndrome, 8개는 다른 syndrome. 두 CNOT이 구별 불가능한 이유는 단지 15-Pauli pool 위의 어떤 permutation $\pi$가 존재해서 $\sigma_{6,\alpha} = \sigma_{7,\pi(\alpha)}$이기 때문. **Pauli 균등 random 가정** 하에서 marginalize하면 분포가 동일해지지만, 만약 Pauli가 fault별로 알려진다면 (main 브랜치의 single-shot frame처럼) 두 CNOT은 구별 가능.
+
+### 13.5 구조적 이유
+
+라운드 순서 $[Z_0, Z_1, Z_2, Z_3, X_0, X_1, X_2, X_3]$에서 stabilizer $S$의 CNOT 직후 주입된 fault는 **(a) $S$보다 라운드 안에서 늦게 실행되는 stabilizer 중 (b) fault 위치의 data qubit을 공유하는 것**에만 영향.
+
+4개 ambiguity 그룹의 멤버들은 모두 **data qubit의 "downstream stabilizer 멤버십"이 동일**한 CNOT들. 예: $X_2$ stab (qubits {3,4,6,7})에서 qubit 7만 후속 $X_3$ stab에 들어감. 따라서 CNOT 18 (target=3), 19 (target=4), 20 (target=6)은 같은 downstream footprint를 공유 → 같은 그룹. CNOT 21 (target=7)만 분리. $G_1, G_2, G_4$도 같은 논리.
+
+→ ceiling은 **stabilizer 측정 스케줄 × code topology**에서 오는 결과이고 Pauli randomness 자체와는 별개. Pauli pool을 바꾸면 일부 그룹은 깰 수 있지만 X-stab 내부 그룹은 못 깸.
+
+### 13.6 15-Pauli vs 9-Pauli 비교
+
+9개 fully-two-qubit Pauli (X/Y/Z × X/Y/Z, single-leg 제외) 만 사용하면:
+
+| Pauli pool | Ambiguity 그룹 | per-class ceiling |
+|---|---|---|
+| 15-Pauli (single-leg 포함) | $\{G_1, G_2, G_3, G_4\}$ | $18/24 = 0.750$ |
+| 9-Pauli (single-leg 제외) | $\{G_2, G_3, G_4\}$ | $19/24 = 0.792$ |
+
+$G_1$ (CNOT 6, 7)은 **pool 의존적**: 6개의 single-leg Pauli가 15-Pauli 모델에서 두 CNOT의 multiset을 "평형화"하는 역할. 빼면 multiset이 $\{0^2, 4^3, 64^1, 68^3\}$ vs $\{0^1, 4^2, 64^2, 68^4\}$로 갈라짐. X-stab 내부 그룹 $G_2, G_3, G_4$는 양쪽에서 살아남음 (구조적).
+
+비교 plot: [data/analysis/6_sequence_ceiling/ceiling_compare_curves.png](data/analysis/6_sequence_ceiling/ceiling_compare_curves.png).
+
+### 13.7 Decoding이 구조적 그룹을 깰 수 있는가?
+
+**아마 깰 수 있을 것으로 추측** — window decoder (R3b 시나리오)를 도입하면 X-stab 내부 그룹도 깨질 가능성이 있음. 직관:
+
+- Decoder 없으면 (R1): dominant CNOT은 *per-round detection event 분포*에만 영향. 두 CNOT의 분포가 동일하면 영원히 구별 불가능.
+- Decoder 있으면: decoder는 관측한 syndrome $s$로부터 correction $C(s)$를 데이터 큐빗에 적용. Syndrome이 $k$와 $k'$에 대해 ambiguous할 때 decoder는 **같은** correction을 적용 — 하지만 **실제 데이터 큐빗 residual 오류는 다름** (실제 fault 위치 qubit이 다르므로). 이 residual은 **이후 라운드**의 syndrome에 구별 가능한 방식으로 전파됨.
+
+구체적으로 $G_3 = \{18, 19, 20\}$의 경우: CNOT 18 fault는 data qubit 3에 residual, CNOT 19는 qubit 4에, CNOT 20은 qubit 6에. 단일 라운드 syndrome은 일치하지만, post-correction residual이 새 fault와 상호작용하면서 그 다음 라운드들의 Z-stab/X-stab 측정에서 통계적으로 구별되는 stream이 나옴.
+
+→ R3b 확장이 단순한 "다른 시나리오"가 아니라 **과학적으로 중요한 후속 작업**. Task #7을 "future work"에서 "near-term experimental priority"로 격상할 만함.
+
+### 13.8 실용적 함의
+
+1. **목표를 18-group (9-Pauli이면 19-group) 식별로 재정의**. 이게 R1 문제의 정보이론적 해상도.
+2. **Group accuracy가 의미 있는 지표**. Per-class accuracy는 0.75에서 천장이 막혀 있어 실제 분류기 품질과 구조적 ambiguity를 섞어버림.
+3. **Viability region은 여전히 의미 있음**. (p_bg, p_high, T)에서 group accuracy는 1/18 (random)에서 1.0까지 변함. `(p_bg=1e-2, p_high=1e-1, T≈100)` 전이 구간이 학습 분류기 (Task #6) 평가의 sweet spot.
+4. **세부 파라미터 결정 (Task #2)은 R3b ceiling 알기 전까지 보류**: 만약 R3b가 X-stab 그룹을 깬다면 (p_bg, p_high, T) 관심 영역이 달라짐.

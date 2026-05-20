@@ -382,3 +382,89 @@ Open extension points: non-Identity decoder path (window state hand-off in `sequ
 > 3. Which of the 72 original collision pairs are broken at the sequence level, and which survive as fundamental limits?
 
 This ceiling is also the ceiling for any trained classifier, so it doubles as an evaluation benchmark for the model phase that follows.
+
+---
+
+## 13. R1 ceiling result (Phase 2 — Task #3)
+
+### 13.1 What we computed
+
+For each candidate dominant CNOT k, the per-round detection event distribution
+
+$$P_k(s) = \left(\bigast_{i \neq k} D_i^{(p_{bg})}\right) \ast D_k^{(p_{high})}, \quad s \in \mathbb{F}_2^8$$
+
+was computed as an XOR-convolution of 24 independent per-CNOT contribution distributions, where each $D_i^{(p)}$ assigns mass $1-p$ to 0 and mass $p/|\text{Pauli pool}|$ to each lookup syndrome. Under reset mode, detection events are i.i.d. across rounds, so the T-round Bayes-optimal classifier is $\hat{k} = \arg\max_k \sum_t \log P_k(d_t)$. Accuracy was estimated by Monte Carlo on a (p_bg, p_high, T) grid.
+
+Sub-task scripts:
+- `src/ceiling.py` — lookup builder, XOR-convolution, Bayes classifier
+- `scripts/compute_r1_ceiling.py` — (p_bg, p_high, T) sweep + visualization
+- `scripts/analyze_ceiling_groups.py` — structural ambiguity group analysis + 15-Pauli vs 9-Pauli comparison
+
+### 13.2 Headline finding — 4 structural ambiguity groups
+
+Two dominant hypotheses $k, k'$ produce identical per-round distributions iff their **single-fault syndrome multisets** $\{\sigma_{k,\alpha}\}_\alpha$ and $\{\sigma_{k',\alpha}\}_\alpha$ are equal as multisets on $\mathbb{F}_2^8$. Direct check on the lookup yields:
+
+| Group | Members | Stabilizer | Multiset (15-Pauli) |
+|---|---|---|---|
+| $G_1$ | CNOT 6, 7 | Z2 stab (data → ancilla) | $\{0^3, 4^4, 64^4, 68^4\}$ |
+| $G_2$ | CNOT 14, 15, 17 | X1 stab interior (ancilla → data) | $\{0^7, 32^8\}$ |
+| $G_3$ | CNOT 18, 19, 20 | X2 stab interior | $\{0^7, 64^8\}$ |
+| $G_4$ | CNOT 22, 23 | X3 stab | $\{0^7, 128^8\}$ |
+
+Total identifiable groups = 24 − (2+3+3+2) + 4 = **18**. Asymptotic per-class accuracy ceiling = $18/24 = 0.750$. Group-level identification reaches 1.0 in the limit.
+
+### 13.3 Verification — Monte Carlo at large T
+
+At $(p_{bg}, p_{high}) = (0.01, 0.3)$:
+
+| T | per-class acc | group acc |
+|---|---|---|
+| 10 | 0.42 | 0.56 |
+| 100 | 0.747 | 0.996 |
+| 300 | 0.749 | 1.000 |
+| 1000 | 0.751 | 1.000 |
+
+→ per-class saturates exactly at 18/24, group accuracy reaches 1.0. Within an ambiguity group the Bayes-optimal classifier predicts one fixed representative; the other members receive 0% accuracy.
+
+### 13.4 Per-Pauli vs multiset — what is and isn't claimed
+
+Two CNOTs in the same group **do not produce identical syndromes for every Pauli**. For CNOT 6 vs 7, only 7 out of 15 Paulis give the same syndrome; the other 8 differ. The two are indistinguishable only because there exists a permutation $\pi$ of the 15-Pauli pool with $\sigma_{6,\alpha} = \sigma_{7,\pi(\alpha)}$. Under the uniform random Pauli assumption, marginalizing yields identical distributions, but if the Pauli were known per fault (as in the main-branch single-shot frame), the two would be distinguishable.
+
+### 13.5 Structural reason
+
+A fault injected after CNOT in stabilizer $S$ during round $t$ can only affect ancilla measurements of stabilizers that **(a) run later than $S$ in the round order $[Z_0, Z_1, Z_2, Z_3, X_0, X_1, X_2, X_3]$, and (b) share a data qubit with the fault location**.
+
+The four ambiguity groups all consist of CNOTs whose data qubits have **identical "downstream stabilizer membership"**. For example, within $X_2$ stab (qubits {3,4,6,7}), only qubit 7 is also in the downstream $X_3$ stab. So CNOTs 18 (target=3), 19 (target=4), 20 (target=6) share the same downstream footprint and collapse, while CNOT 21 (target=7) is set apart. Identical reasoning applies to $G_1, G_2, G_4$.
+
+→ The ceiling reflects **stabilizer measurement schedule × code topology**, not Pauli randomness. Changing the Pauli pool can partially shrink the ambiguity (see next), but cannot eliminate the X-stab interior groups.
+
+### 13.6 15-Pauli vs 9-Pauli comparison
+
+If we restrict to the 9 fully-two-qubit Paulis (X/Y/Z × X/Y/Z, excluding single-leg IX, XI, etc.):
+
+| Pauli pool | Ambiguity groups | per-class ceiling |
+|---|---|---|
+| 15-Pauli (incl. single-leg) | $\{G_1, G_2, G_3, G_4\}$ | $18/24 = 0.750$ |
+| 9-Pauli (no single-leg) | $\{G_2, G_3, G_4\}$ | $19/24 = 0.792$ |
+
+$G_1$ (CNOT 6, 7) is **pool-dependent**: the 6 single-leg Paulis play a "noise-balancing" role that equalizes their multisets in the 15-Pauli model. Remove them, and the multisets become $\{0^2, 4^3, 64^1, 68^3\}$ vs $\{0^1, 4^2, 64^2, 68^4\}$ — distinct. The X-stab interior groups $G_2, G_3, G_4$ survive both pools (structural).
+
+See [data/analysis/6_sequence_ceiling/ceiling_compare_curves.png](data/analysis/6_sequence_ceiling/ceiling_compare_curves.png) for the per-class accuracy curves under both models.
+
+### 13.7 Could decoding break the structural groups?
+
+We conjecture **yes** — adding a window decoder (the R3b scenario) likely breaks the X-stab interior groups too. The intuition:
+
+- Without a decoder (R1), the dominant CNOT only affects the *per-round detection event distribution*. Two CNOTs producing identical distributions are forever indistinguishable.
+- With a decoder, the decoder applies a correction $C(s)$ based on the observed syndrome $s$. When syndromes are ambiguous between $k$ and $k'$, the decoder applies the **same** correction to both — but the **actual residual data-qubit error differs** (because the true fault was at a different physical qubit). This residual cascades into **subsequent** rounds' syndromes in distinguishable ways.
+
+Concretely for $G_3 = \{18, 19, 20\}$: a fault at CNOT 18 leaves residual on data qubit 3; at CNOT 19, on qubit 4; at CNOT 20, on qubit 6. Single-round syndromes coincide, but subsequent rounds' Z-stab and X-stab measurements involving those different qubits would produce statistically distinct streams once the post-correction residual interacts with new faults.
+
+→ This makes the R3b extension scientifically valuable, not just an "alternative scenario". Promoting Task #7 from "future work" to "near-term experimental priority" is warranted.
+
+### 13.8 Practical implications
+
+1. **Redefine the target as 18-group (or 19-group with 9-Pauli) identification.** That's the information-theoretic resolution of the R1 problem.
+2. **Group accuracy is the operationally meaningful metric.** Per-class accuracy is capped at 0.75 by construction and conflates real classifier quality with structural ambiguity.
+3. **Viability region is still meaningful.** Within (p_bg, p_high, T), group accuracy ranges from 1/18 (random) to 1.0. The transition region around `(p_bg=1e-2, p_high=1e-1, T≈100)` is the sweet spot for evaluating learned classifiers (Task #6).
+4. **Defer detailed parameter selection (Task #2)** until R3b ceiling is known: if R3b breaks the X-stab groups, the (p_bg, p_high, T) region of interest shifts.

@@ -1,0 +1,225 @@
+{
+  "n_cnot": 24,
+  "pauli_pool_15": {
+    "size": 15,
+    "members": [
+      "IX",
+      "IY",
+      "IZ",
+      "XI",
+      "XX",
+      "XY",
+      "XZ",
+      "YI",
+      "YX",
+      "YY",
+      "YZ",
+      "ZI",
+      "ZX",
+      "ZY",
+      "ZZ"
+    ],
+    "ambiguity_groups": [
+      {
+        "members": [
+          6,
+          7
+        ],
+        "labels": [
+          "CNOT06 Z2 3->11",
+          "CNOT07 Z2 6->11"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          4,
+          4,
+          4,
+          4,
+          64,
+          64,
+          64,
+          64,
+          68,
+          68,
+          68,
+          68
+        ]
+      },
+      {
+        "members": [
+          14,
+          15,
+          17
+        ],
+        "labels": [
+          "CNOT14 X1 14->1",
+          "CNOT15 X1 14->2",
+          "CNOT17 X1 14->5"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          32,
+          32,
+          32,
+          32,
+          32,
+          32,
+          32,
+          32
+        ]
+      },
+      {
+        "members": [
+          18,
+          19,
+          20
+        ],
+        "labels": [
+          "CNOT18 X2 15->3",
+          "CNOT19 X2 15->4",
+          "CNOT20 X2 15->6"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          64,
+          64,
+          64,
+          64,
+          64,
+          64,
+          64,
+          64
+        ]
+      },
+      {
+        "members": [
+          22,
+          23
+        ],
+        "labels": [
+          "CNOT22 X3 16->7",
+          "CNOT23 X3 16->8"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          128,
+          128,
+          128,
+          128,
+          128,
+          128,
+          128,
+          128
+        ]
+      }
+    ],
+    "asymptotic_per_class_ceiling": 0.75,
+    "asymptotic_group_ceiling": 1.0
+  },
+  "pauli_pool_9": {
+    "size": 9,
+    "members": [
+      "XX",
+      "XY",
+      "XZ",
+      "YX",
+      "YY",
+      "YZ",
+      "ZX",
+      "ZY",
+      "ZZ"
+    ],
+    "ambiguity_groups": [
+      {
+        "members": [
+          14,
+          15,
+          17
+        ],
+        "labels": [
+          "CNOT14 X1 14->1",
+          "CNOT15 X1 14->2",
+          "CNOT17 X1 14->5"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          32,
+          32,
+          32,
+          32,
+          32,
+          32
+        ]
+      },
+      {
+        "members": [
+          18,
+          19,
+          20
+        ],
+        "labels": [
+          "CNOT18 X2 15->3",
+          "CNOT19 X2 15->4",
+          "CNOT20 X2 15->6"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          64,
+          64,
+          64,
+          64,
+          64,
+          64
+        ]
+      },
+      {
+        "members": [
+          22,
+          23
+        ],
+        "labels": [
+          "CNOT22 X3 16->7",
+          "CNOT23 X3 16->8"
+        ],
+        "multiset_sorted": [
+          0,
+          0,
+          0,
+          128,
+          128,
+          128,
+          128,
+          128,
+          128
+        ]
+      }
+    ],
+    "asymptotic_per_class_ceiling": 0.7916666666666666,
+    "asymptotic_group_ceiling": 1.0
+  },
+  "note": "Per-class ceiling is the fraction of CNOTs that lie in singleton groups (uniquely identifiable). Within a group of size g, the Bayes-optimal predictor picks one representative, so per-class accuracy averages to (# singletons + # groups) / 24. Group accuracy reaches 1.0 since group identity is identifiable."
+}
