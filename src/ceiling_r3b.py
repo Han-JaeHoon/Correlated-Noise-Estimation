@@ -37,6 +37,7 @@ import numpy as np
 
 from .ceiling import N_STAB, N_SYN
 from .decoder import IdentityDecoder, LookupDecoder
+from .fast_simulator import run_sequence_symbolic
 from .sequence_runner import run_sequence
 from .stochastic_faults import BackgroundElevatedSampler
 from .surface_code_layout import enumerate_stabilizer_cnots
@@ -58,20 +59,36 @@ def simulate_class_sequences(
     decoder_kind: str,
     rng: np.random.Generator,
     reset_after_measure: bool = True,
+    use_symbolic: bool = True,
+    decoder=None,
 ) -> np.ndarray:
     """
     Run `n_samples` independent T-round sequences with dominant CNOT = k_dom,
     under either the R1 (`'identity'`) or R3b (`'lookup'`) decoder.
 
+    Args:
+        use_symbolic: if True (default), use the pure-symbolic Pauli-frame
+            simulator (`src/fast_simulator.run_sequence_symbolic`). This is
+            ~100–1000× faster than the PennyLane path and produces bit-
+            identical syndromes (verified by sanity_check_fast_simulator).
+            Set to False to use the PennyLane runner — only useful as a
+            cross-check.
+        decoder: pre-built decoder instance (so callers can reuse the costly
+            LookupDecoder construction across all classes). If None, a fresh
+            one is built per call.
+
     Returns:
         syndromes: (n_samples, T, 8) uint8.
     """
-    if decoder_kind == "identity":
-        decoder = IdentityDecoder()
-    elif decoder_kind == "lookup":
-        decoder = LookupDecoder(reset=reset_after_measure)
-    else:
-        raise ValueError(f"unknown decoder_kind {decoder_kind!r}")
+    if decoder is None:
+        if decoder_kind == "identity":
+            decoder = IdentityDecoder()
+        elif decoder_kind == "lookup":
+            decoder = LookupDecoder(reset=reset_after_measure)
+        else:
+            raise ValueError(f"unknown decoder_kind {decoder_kind!r}")
+
+    runner = run_sequence_symbolic if use_symbolic else run_sequence
 
     syndromes = np.zeros((n_samples, T, 8), dtype=np.uint8)
     for i in range(n_samples):
@@ -82,7 +99,7 @@ def simulate_class_sequences(
             faulty_cnot_id=int(k_dom),
             rng=np.random.default_rng(seed_i),
         )
-        out = run_sequence(
+        out = runner(
             T=T,
             sampler=sampler,
             decoder=decoder,
@@ -140,6 +157,14 @@ def build_class_marginals(
         marginals: (24, 256) float64.
     """
     marginals = np.zeros((N_CNOT, N_SYN), dtype=np.float64)
+    # Build the decoder once and reuse across classes (LookupDecoder's
+    # construction is O(24*15) lookup work — non-trivial repeated cost).
+    if decoder_kind == "identity":
+        decoder = IdentityDecoder()
+    elif decoder_kind == "lookup":
+        decoder = LookupDecoder(reset=True)
+    else:
+        raise ValueError(f"unknown decoder_kind {decoder_kind!r}")
     for k in range(N_CNOT):
         syn = simulate_class_sequences(
             k_dom=k,
@@ -149,6 +174,7 @@ def build_class_marginals(
             p_high=p_high,
             decoder_kind=decoder_kind,
             rng=rng,
+            decoder=decoder,
         )
         marginals[k] = estimate_per_round_marginal(
             syn,
