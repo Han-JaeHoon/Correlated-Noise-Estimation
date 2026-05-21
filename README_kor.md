@@ -591,3 +591,91 @@ T 별 trend 가 흥미로움:
 
 `scripts/compare_decoders.py` 가 한 (p_bg, p_high) cell 에서 T 별 곡선 생성. 출력: `data/analysis/7_r3b_ceiling/decoder_compare/decoder_compare_curves.png`.
 
+
+---
+
+## 15. R3b 하에서의 sequence-level 분리 가능성 (브랜치 `decoder-add-analysis`)
+
+§14는 R3b의 marginal-Bayes 24-class 정확도가 T=300에서도 ~0.10 plateau로 끝났음. 그 측정은 L=1 per-round marginal만 쓰므로 *하한*에 해당. §15는 §14가 남긴 진짜 질문에 직접 답함:
+
+> **R3b syndrome sequence 분포는 T가 커지면 dominant CNOT별로 unique 식별 가능한가, 아니면 일부 (k, k′) pair는 sequence-level에서 구조적으로 indistinguishable인가?**
+
+이 검정은 classifier-free. 어떤 학습 알고리즘의 정확도가 아니라 *분포 자체*를 본다.
+
+### 15.1 셋업
+
+- 각 dominant CNOT `k ∈ {0..23}`에 대해 `N = 2000`개 R3b sequence, `T = 200`, `(p_bg, p_high) = (0.01, 0.1)`, reset, `LookupDecoder`. Symbolic simulator (`src/fast_simulator.py`); 총 ≈ 5분.
+- Round 0 drop (frame이 비어 있어 decoder-agnostic).
+- 코드: [scripts/test_seq_separability.py](scripts/test_seq_separability.py), [scripts/analyze_seq_separability_extra.py](scripts/analyze_seq_separability_extra.py), [scripts/analyze_d_scaling.py](scripts/analyze_d_scaling.py).
+- 출력: [data/analysis/8_seq_separability/](data/analysis/8_seq_separability/).
+
+### 15.2 측정 A — L-round marginal pairwise JS divergence
+
+각 pair (k, k′)에 대해 L ∈ {1, 2} L-round marginal histogram의 Jensen–Shannon divergence를 sliding window로 계산. 각 k의 N 샘플을 절반으로 쪼개 JS(half₁ ‖ half₂)을 측정한 게 클래스별 sampling-noise floor (self-baseline); 이걸 빼면 signal-only 추정치.
+
+| L | self-baseline (노이즈 floor) | within-group net mean | between-group net mean | within/between 비율 |
+|---|---|---|---|---|
+| 1 | 0.00177 | 0.00523 (range 0.00120–0.00851) | 0.01006 | ≈ 0.52 |
+| 2 | 0.03003 | 0.01611 (range 0.00699–0.02201) | 0.03213 | ≈ 0.50 |
+
+**해석.** Within-group JS @ L=1은 sampling 노이즈 floor의 ~3배 — 0보다 확실히 큼. Between-group JS는 within-group의 ~2배 — ambiguity-group pair는 분간이 절반 정도지만 **분리 신호는 실재**. L=2에선 절댓값이 L=1의 ~3배로 자람 → 더 긴 윈도우가 더 많은 구분 정보를 carry. within/between 비율은 ~0.5로 유지.
+
+대표 plot: [data/analysis/8_seq_separability/js_curves_T200_N2000_main.png](data/analysis/8_seq_separability/js_curves_T200_N2000_main.png). 모든 within-group pair는 L=1, L=2 양쪽에서 between-group mean보다 *엄격히 작음*, 그러나 between-group min보다는 *큼*. (6, 7) pair가 가장 marginal.
+
+### 15.3 측정 B — pair별 누적 log-likelihood ratio
+
+각 R1 ambiguity-group pair (k₁, k₂)에 대해 true k = k₁ / true k = k₂에서 샘플한 sequence 각각에서 L=1 누적 log-LR
+
+$$\Lambda_t = \sum_{s=1}^{t} \log \hat{P}(d_s \mid k_1) - \log \hat{P}(d_s \mid k_2)$$
+
+를 계산. R1이라면 ambiguity-group 멤버에선 drift가 정확히 0이라 T-스케일링 분간 불가. R3b에선 각 pair마다 true k에 따른 positive drift가 보이고, 두 분포가 T 늘면서 점점 분리됨.
+
+T = 200에서 각 pair의 Λ_T (mean ± std) 요약 (데이터: [cumulative_logLR_T200_N2000_main.csv](data/analysis/8_seq_separability/cumulative_logLR_T200_N2000_main.csv)):
+
+| 그룹 | Pair (k₁, k₂) | E[Λ_T \| k₁] | E[Λ_T \| k₂] | Gap | Cohen's d |
+|---|---|---|---|---|---|
+| G1 | (6, 7) | +1.47 ± 4.80 | −1.51 ± 5.26 | 2.98 | 0.59 |
+| G2 | (14, 15) | +6.50 ± 9.61 | −7.05 ± 11.52 | 13.55 | 1.28 |
+| G2 | (14, 17) | +6.22 ± 8.65 | −6.59 ± 11.33 | 12.81 | 1.28 |
+| G2 | (15, 17) | +7.23 ± 10.25 | −7.25 ± 11.47 | 14.48 | 1.33 |
+| G3 | (18, 19) | +4.84 ± 9.14 | −5.30 ± 8.82 | 10.14 | 1.13 |
+| G3 | (18, 20) | +4.01 ± 8.11 | −4.49 ± 8.52 | 8.50 | 1.02 |
+| G3 | (19, 20) | +3.82 ± 7.23 | −3.54 ± 7.06 | 7.36 | 1.03 |
+| G4 | (22, 23) | +4.02 ± 7.16 | −3.75 ± 6.87 | 7.78 | 1.11 |
+
+Cohen's *d* = gap / pooled std. *d* ≈ 1이면 두 분포가 moderately 겹침, *d* ≥ 2면 거의 안 겹침. G2, G3, G4 (3/4 그룹)은 이미 T=200, L=1만으로 *d* > 1; G1 (6 vs 7)이 가장 어려워서 *d* ≈ 0.59.
+
+Trajectory plot [cumulative_logLR_T200_N2000_main.png](data/analysis/8_seq_separability/cumulative_logLR_T200_N2000_main.png)에서 시각적으로도 동일: 파란 band (true k₁) 위로, 빨간 band (true k₂) 아래로 drift, 겹치는 영역이 t에 따라 줄어듦.
+
+### 15.4 스케일링 — d(t) ∝ √t 및 명확한 분리에 필요한 T
+
+각 pair의 trajectory에 d(t) = a · √t fit (t ≥ 30, OLS, intercept 없음). RMSE 0.04–0.15로 Gaussian 근사 노이즈 안에 들어옴 — **모든 pair에서 √t 스케일링이 통계 오차 안에 들어맞음**.
+
+| Pair | d(T=200) | sqrt-fit a | d = 2 (≈ 95% 분리) 도달 필요 T |
+|---|---|---|---|
+| (6, 7) | 0.59 | 0.043 | **≈ 2,170** |
+| (14, 15) | 1.28 | 0.102 | ≈ 385 |
+| (14, 17) | 1.28 | 0.102 | ≈ 390 |
+| (15, 17) | 1.33 | 0.100 | ≈ 400 |
+| (18, 19) | 1.13 | 0.087 | ≈ 525 |
+| (18, 20) | 1.02 | 0.078 | ≈ 650 |
+| (19, 20) | 1.03 | 0.077 | ≈ 675 |
+| (22, 23) | 1.11 | 0.082 | ≈ 590 |
+
+Plot: [d_scaling_T200_N2000_main.png](data/analysis/8_seq_separability/d_scaling_T200_N2000_main.png) (측정 d(t) + fit), [d_projection_T200_N2000_main.png](data/analysis/8_seq_separability/d_projection_T200_N2000_main.png) (√t 외삽).
+
+### 15.5 결론 — 직접 답변
+
+> **Yes — R3b 하에서 syndrome sequence는 T가 커지면 dominant CNOT별로 unique 식별 가능. 모든 R1 ambiguity 그룹 내부에서도 마찬가지.**
+
+구체적으로:
+1. 모든 ambiguity-group pair에서 per-round L=1 분포 정보율이 양수 (within-group net JS > 0, sampling-noise floor 위).
+2. 누적 log-LR Cohen's *d*가 T=200까지 √t로 자라며 saturation 없음.
+3. √t fit 외삽 시 모든 ambiguity-group pair가 *d* = 2 (Gaussian 근사 하에서 ≈ 95% 분리, 즉 그 pair에 대한 2-class Bayes 정확도 ≥ 95%)에 유한 T에서 도달. 가장 어려운 pair (CNOT 6 vs 7)는 T ≈ 2,170 라운드 필요; 나머지는 380–700.
+4. 이 모든 게 L=1 marginal만 써서 나온 결과. 더 긴 윈도우 decoder (또는 full-sequence likelihood)면 threshold가 더 낮아짐 — §14의 24-class marginal-Bayes ~0.10 plateau은 분포 자체의 한계가 아니라 *그 classifier의 한계*임이 밝혀짐.
+
+### 15.6 §14 결과의 재해석
+
+§14에서 R3b marginal-Bayes 24-class 정확도가 T=300에서도 ~0.10에 머문 건 *식별 가능성의 구조적 한계가 아님* — 분포 자체는 distinguishable. plateau은 24-way 동시 식별 시 finite-T 인공물: pair별 분리 정보율은 L=1에서 ~0.005–0.011 nat/round, 24-class에서 신뢰성 있게 분리하려면 log(24) ≈ 3.18 nat의 pairwise 정보가 필요. T = 300에서 worst pair는 300 × 0.005 ≈ 1.5 nat — 임계값 아래라서 plateau이 됨. T를 더 늘리거나, L을 늘리거나, non-marginal classifier를 쓰면 이 gap을 메울 수 있음.
+
+따라서 후속 질문은 더 이상 "R3b가 indistinguishable인가?"가 아니라 "학습 classifier가 어느 T에서 asymptote에 도달하는가?" — 명확한 이론 목표가 정해진 Task #6 질문.

@@ -1,0 +1,38 @@
+{
+  "p_bg": 0.01,
+  "p_high": 0.1,
+  "T": 200,
+  "n_samples": 2000,
+  "L_list": [
+    1,
+    2
+  ],
+  "seed": 0,
+  "gen_seconds": 318.65224409103394,
+  "summary": [
+    {
+      "L": 1,
+      "within_n": 8,
+      "within_min": 0.0018682125153942945,
+      "within_mean": 0.0059959940375926965,
+      "within_max": 0.008928934519074167,
+      "between_n": 268,
+      "between_min": 0.0016041348053999465,
+      "between_mean": 0.010756511939281233,
+      "between_max": 0.01803086356824521,
+      "ratio_between_over_within": 1.793949739082765
+    },
+    {
+      "L": 2,
+      "within_n": 8,
+      "within_min": 0.025129957488481586,
+      "within_mean": 0.03508116542329902,
+      "within_max": 0.04038037122484817,
+      "between_n": 268,
+      "between_min": 0.025598416048140695,
+      "between_mean": 0.05118002755264513,
+      "between_max": 0.06434443362835898,
+      "ratio_between_over_within": 1.4589032871369236
+    }
+  ]
+}

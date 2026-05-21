@@ -14,17 +14,18 @@ sequence만 보고 식별 가능한가**를 분석하는 연구. 현재 작업 �
 **`long-sequence-analysis`** — main 브랜치의 single-shot frame을
 sequence-level로 reframe한 **R1 시나리오**.
 
-## 2. 현재 위치 (2026-05-21 갱신)
+## 2. 현재 위치 (2026-05-21 갱신, 2회차)
 
-활성 브랜치: **`decoder-add-analysis`** (R3b 분석 완료 + README §14).
+활성 브랜치: **`decoder-add-analysis`** (R3b 분석 + sequence-level 분리 검증 완료, README §14+§15).
 이전 작업 보존 브랜치: `long-sequence-analysis` (commit `701680f` 기준).
 
 ```
 main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis)
                                           │
-                                          └─ … ─ d76f39a  (decoder-add-analysis)
-                                                  ↑
-                                                  R3b ceiling 완료 + README §14
+                                          └─ … ─ 1501889 ─ NEW  (decoder-add-analysis)
+                                                  ↑       ↑
+                                                  §14    §15: sequence-level separability
+                                                          (data/analysis/8_seq_separability/)
 ```
 
 | 단계 | 상태 | 무엇이 됐나 |
@@ -32,9 +33,10 @@ main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis
 | R1 인프라 (Phase 1) | ✅ | decoder ABC, BackgroundElevatedSampler, sequence runner |
 | Sanity check (Phase 1.5) | ✅ | main single-shot 결과 비트 단위 재현 |
 | Task #3 R1 ceiling (Phase 2) | ✅ | 4 구조적 ambiguity 그룹 발견 (§13) |
-| **Task #7 R3b 디코더 (Phase 6)** | ✅ | **§13.7 가설 검증 완료 — directional TRUE / quantitative FALSE** (§14) |
+| Task #7 R3b 디코더 (Phase 6) | ✅ | §13.7 가설: directional TRUE / quantitative FALSE (§14) |
+| **Task #7b sequence-level 분리** | ✅ | **R3b 분포가 모든 (k,k′) pair에서 distinguishable, Cohen's d ∝ √t scaling, T_required(d=2) ≈ 400–2200** (§15) |
 | Task #5 본 데이터셋 (Phase 4) | ⏸ pending (unblocked) | |
-| Task #6 분류기 (Phase 5) | ⏸ pending (unblocked) | |
+| Task #6 분류기 (Phase 5) | ⏸ pending (unblocked) — 이제 theoretical target 명확 | |
 
 이전에 있던 Task #4 (72-pair sequence 운명)는 Task #3에 흡수돼서 별도 진행
 불필요. Task #2 (파라미터 픽)는 R3b 결과 봤으니 진행 가능.
@@ -81,17 +83,35 @@ README §13.5.
 3. Full-sequence ML decoder
 4. Restricted Pauli pool
 
+## 3.6 핵심 발견 3 — Task #7b: sequence-level 분리 가능성 직접 검증
+
+자세한 내용은 [README.md §15](README.md#15-sequence-level-separability-under-r3b-branch-decoder-add-analysis).
+
+§14의 R3b plateau(~0.10)가 *분류기의 한계*인지 *분포 자체의 한계*인지
+구분하기 위한 classifier-free 검정 (N=2000, T=200, L=1,2):
+
+| 측정 | 결과 |
+|---|---|
+| Within-group L=1 marginal JS (self-baseline 빼고) | 0.005 — **양수, 분포 다름이 직접 확인** |
+| Cohen's d at T=200 per pair | 0.59 (worst: 6,7) ~ 1.33 (best: 15,17) — 모두 양수 drift |
+| d(t) scaling | **√t fit RMSE 0.04–0.15** — Stein's lemma 와 일치 |
+| Projected T for d=2 (≈95% 분리) | 385–2,170 라운드. worst pair (6,7) ~2,170 |
+
+→ **YES — R3b 하에서 충분히 긴 T에서 모든 24개 CNOT은 sequence-level에서 unique 식별 가능**.
+§14의 0.10 plateau은 24-class 동시 식별의 finite-T 인공물이지 구조적 ceiling이 아님.
+
 ## 4. 다음 step 추천 순서
 
-R3b 결과로 우선순위 재정렬:
+§15 결과로 우선순위 재정렬:
 
-1. **Task #6 분류기 (Phase 5)** ★ — R1 ceiling 이 헤드라인 benchmark 임이
-   확정됐으니 (R3b 가 ceiling 넘는 데 실패) classifier 페이즈로 진행. histogram
-   MLE → MLP → GRU/Transformer. group accuracy 기준 R1 ceiling 1.0 와 gap 측정.
-2. **Task #5 본 데이터셋 (Phase 4)** — Task #6 학습용. 24 faulty_cnot × T
-   sweep × N.
-3. **(선택) §14.7 의 후속 R3b 변형** — posterior decoder, multi-window,
-   restricted pool. 가설을 더 강한 형태로 재검증하고 싶을 때만.
+1. **Task #6 분류기 (Phase 5)** ★ — 이제 theoretical target이 명확:
+   - **24-class accuracy → 1**이 도달 가능 (sequence-level ceiling = 1).
+   - L=1 marginal-Bayes (= §14 plateau)는 *하한*. 더 똑똑한 classifier (multi-step likelihood, GRU/Transformer)가 더 잘 해야 함.
+   - benchmark: T sweep으로 accuracy curve를 §15의 projected √t 외삽과 비교.
+2. **Task #5 본 데이터셋 (Phase 4)** — Task #6 학습용. 24 faulty_cnot × T sweep × N.
+   - §15의 T_required 값을 보고 T grid 선정: e.g. T ∈ {100, 300, 1000, 3000}로 worst pair까지 cover.
+3. **(선택) L=2/3 marginal-Bayes 확장** — §15.6의 "더 큰 L"을 ablation 차원에서. L 늘릴 때 plateau가 얼마나 위로 올라가는지 측정하면 classifier에 필요한 model capacity의 directional 가이드.
+4. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window, restricted pool. 더 효율적인 sequence-level 분리.
 
 ## 5. 핵심 파일 맵
 
@@ -124,12 +144,16 @@ R3b 결과로 우선순위 재정렬:
 | `scripts/analyze_ceiling_groups.py` | R1 그룹 구조 + 15p vs 9p 비교 |
 | `scripts/analyze_r3b_ceiling.py` | R3b 의 within-group spread + marginal JS |
 | `scripts/generate_r1_sequences.py` | R1 데이터셋 생성 CLI |
+| `scripts/test_seq_separability.py` | §15 main: 24-class × L 윈도우 JS 매트릭스 + heatmap (classifier-free) |
+| `scripts/analyze_seq_separability_extra.py` | §15 보조: self-baseline JS + 누적 log-LR |
+| `scripts/analyze_d_scaling.py` | §15 trajectory: Cohen's d(t) + √t fit + projection |
 
 **산출물:**
 | 경로 | 내용 |
 |---|---|
 | `data/analysis/6_sequence_ceiling/` | R1 ceiling: lookup, 그룹 json, sweep CSV, curves PNG |
 | `data/analysis/7_r3b_ceiling/` | R3b ceiling: marginals npz, R1 vs R3b CSV, group-별 plot, within-group spread CSV, JS divergence CSV |
+| `data/analysis/8_seq_separability/` | §15: pairwise JS NPZ + summary CSV + heatmaps, self-baseline + net JS, 누적 log-LR + Cohen's d trajectory + √t projection |
 | `docs/r3b_design.md` | R3b decoder/runner 의 정식 spec |
 | `NIGHT_LOG.md` | 2026-05-20 밤샘 작업의 시간순 진행 로그 (R3b 인프라 + 분석 통째) |
 

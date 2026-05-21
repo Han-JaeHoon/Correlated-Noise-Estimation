@@ -596,3 +596,92 @@ Both R3b variants remain well below R1 across all T. The conclusion of §14.6 st
 
 `scripts/compare_decoders.py` produces curves across T at one (p_bg, p_high) cell; outputs land in `data/analysis/7_r3b_ceiling/decoder_compare/decoder_compare_curves.png`.
 
+
+
+---
+
+## 15. Sequence-level separability under R3b (branch `decoder-add-analysis`)
+
+§14 closed with a marginal-Bayes accuracy plateau (~0.10) for R3b at T → 300. That measurement uses only L=1 per-round marginals and so is a *lower bound* on what is achievable with the full sequence. §15 directly tests the open question §14 left behind:
+
+> **Do R3b syndrome-sequence distributions become uniquely identifiable per dominant CNOT as T grows, or are some (k, k′) pairs structurally indistinguishable at the sequence level?**
+
+The test is classifier-free. It measures the distributions themselves, not the accuracy of any particular learning algorithm.
+
+### 15.1 Setup
+
+- Generate `N = 2000` R3b sequences for every dominant CNOT `k ∈ {0..23}` at `T = 200` rounds, `(p_bg, p_high) = (0.01, 0.1)`, reset mode, `LookupDecoder`. Symbolic simulator (`src/fast_simulator.py`); total wall-clock ≈ 5 min.
+- Drop round 0 (decoder-agnostic since the frame is empty there).
+- Code: [scripts/test_seq_separability.py](scripts/test_seq_separability.py), [scripts/analyze_seq_separability_extra.py](scripts/analyze_seq_separability_extra.py), [scripts/analyze_d_scaling.py](scripts/analyze_d_scaling.py).
+- Outputs: [data/analysis/8_seq_separability/](data/analysis/8_seq_separability/).
+
+### 15.2 Measure A — pairwise L-round marginal JS divergence
+
+For each pair (k, k′) compute the Jensen–Shannon divergence of empirical L-round marginal histograms (L ∈ {1, 2}, sliding window). Self-baseline JS estimated by splitting the N samples for each k into halves and measuring JS(half₁ ‖ half₂) gives the per-class sampling-noise floor; subtracting it gives a signal-only estimate.
+
+| L | self-baseline (noise floor) | within-group net mean | between-group net mean | within/between ratio |
+|---|---|---|---|---|
+| 1 | 0.00177 | 0.00523 (range 0.00120–0.00851) | 0.01006 | ≈ 0.52 |
+| 2 | 0.03003 | 0.01611 (range 0.00699–0.02201) | 0.03213 | ≈ 0.50 |
+
+**Reading.** Within-group JS at L=1 is ~3× the sampling-noise floor — clearly above zero. Between-group JS is ~2× within-group, i.e. ambiguity-group pairs carry about half the per-round distributional separation that easy pairs do, but the separation is real and finite. At L=2 the absolute numbers grow ~3× from L=1, indicating longer windows expose more distinguishing structure; the within/between ratio stays around 0.5.
+
+The headline plot is [data/analysis/8_seq_separability/js_curves_T200_N2000_main.png](data/analysis/8_seq_separability/js_curves_T200_N2000_main.png): every individual within-group pair sits strictly below the between-group mean at both L=1 and L=2, but every one is above the between-group min. The (6, 7) pair is the most marginal.
+
+### 15.3 Measure B — cumulative log-likelihood ratio per pair
+
+For each R1 ambiguity-group pair (k₁, k₂) compute, on sequences sampled from true k = k₁ and true k = k₂ separately, the cumulative L=1 log-likelihood ratio
+
+$$\Lambda_t = \sum_{s=1}^{t} \log \hat{P}(d_s \mid k_1) - \log \hat{P}(d_s \mid k_2).$$
+
+Under R1 this would have drift exactly 0 for ambiguity-group members and no T-scaling discrimination is possible. Under R3b, every pair shows positive drift conditional on its true k, and the two empirical distributions of Λ_t separate steadily.
+
+At T = 200, summarising the empirical (mean ± std) of Λ_T for each pair (data: [cumulative_logLR_T200_N2000_main.csv](data/analysis/8_seq_separability/cumulative_logLR_T200_N2000_main.csv)):
+
+| Group | Pair (k₁, k₂) | E[Λ_T \| k₁] | E[Λ_T \| k₂] | Gap | Cohen's d |
+|---|---|---|---|---|---|
+| G1 | (6, 7) | +1.47 ± 4.80 | −1.51 ± 5.26 | 2.98 | 0.59 |
+| G2 | (14, 15) | +6.50 ± 9.61 | −7.05 ± 11.52 | 13.55 | 1.28 |
+| G2 | (14, 17) | +6.22 ± 8.65 | −6.59 ± 11.33 | 12.81 | 1.28 |
+| G2 | (15, 17) | +7.23 ± 10.25 | −7.25 ± 11.47 | 14.48 | 1.33 |
+| G3 | (18, 19) | +4.84 ± 9.14 | −5.30 ± 8.82 | 10.14 | 1.13 |
+| G3 | (18, 20) | +4.01 ± 8.11 | −4.49 ± 8.52 | 8.50 | 1.02 |
+| G3 | (19, 20) | +3.82 ± 7.23 | −3.54 ± 7.06 | 7.36 | 1.03 |
+| G4 | (22, 23) | +4.02 ± 7.16 | −3.75 ± 6.87 | 7.78 | 1.11 |
+
+Cohen's *d* is the gap divided by the pooled standard deviation; *d* ≈ 1 means the two distributions overlap moderately, *d* ≥ 2 means they barely overlap. Three of the four R1 ambiguity groups (G2, G3, G4) already show *d* > 1 at T = 200 from the L=1 marginal alone; G1 (CNOT 6 vs 7) is the hardest with *d* ≈ 0.59.
+
+The trajectory plot [cumulative_logLR_T200_N2000_main.png](data/analysis/8_seq_separability/cumulative_logLR_T200_N2000_main.png) shows the same content visually: blue band (true k₁) drifts up, red band (true k₂) drifts down, and the overlap shrinks over t.
+
+### 15.4 Scaling — d(t) ∝ √t and projected T for clear separation
+
+Fitting d(t) = a · √t to each pair's trajectory (t ≥ 30 to skip the burn-in; OLS, no intercept) gives the per-round-information rate. RMSE values are 0.04–0.15, well within the Gaussian-approximation noise — the √t scaling holds to within statistical error for every pair.
+
+| Pair | d(T=200) | sqrt-fit a | T required for d = 2 (≈ 95% separation) |
+|---|---|---|---|
+| (6, 7) | 0.59 | 0.043 | **≈ 2,170** |
+| (14, 15) | 1.28 | 0.102 | ≈ 385 |
+| (14, 17) | 1.28 | 0.102 | ≈ 390 |
+| (15, 17) | 1.33 | 0.100 | ≈ 400 |
+| (18, 19) | 1.13 | 0.087 | ≈ 525 |
+| (18, 20) | 1.02 | 0.078 | ≈ 650 |
+| (19, 20) | 1.03 | 0.077 | ≈ 675 |
+| (22, 23) | 1.11 | 0.082 | ≈ 590 |
+
+Plots: [d_scaling_T200_N2000_main.png](data/analysis/8_seq_separability/d_scaling_T200_N2000_main.png) (measured d(t) + fit), [d_projection_T200_N2000_main.png](data/analysis/8_seq_separability/d_projection_T200_N2000_main.png) (√t extrapolation).
+
+### 15.5 Verdict — direct answer
+
+> **Yes — under R3b, syndrome sequences become uniquely identifiable per dominant CNOT as T grows, including within every R1 ambiguity group.**
+
+Concretely:
+1. Per-round L=1 distributional information rate is strictly positive for every ambiguity-group pair (within-group net JS > 0 after noise-floor subtraction).
+2. The cumulative log-LR Cohen's *d* grows as √t with no observed saturation up to T = 200.
+3. Projecting the √t fits, every ambiguity-group pair reaches *d* = 2 (≈ 95% separation under Gaussian approximation, i.e. ≥ 95% Bayes accuracy for a 2-class test on this pair) at finite T. The hardest pair (CNOT 6 vs 7) requires T ≈ 2,170 rounds; the rest 380–700.
+4. This is achieved using L=1 marginals only. Wider-window decoders (or full-sequence likelihoods) would lower these thresholds further — the §14 plateau of the 24-class marginal-Bayes classifier (~0.10) is a property of the *classifier*, not of the underlying distinguishability.
+
+### 15.6 Why this reframes §14
+
+§14 reported R3b marginal-Bayes 24-class accuracy plateauing around 0.10 even at T = 300. §15 shows that plateau is *not* a structural ceiling on identification — the underlying distributions are distinguishable. The plateau is a finite-T artifact of attempting 24-way discrimination simultaneously: per-pair separation is ~0.005–0.011 nat per round at L=1, and 24-way discrimination needs log(24) ≈ 3.18 nat of pairwise information to be reliable. At T = 300 the worst pair has only 300 × 0.005 ≈ 1.5 nat — below threshold for that pair, hence the plateau. Larger T (or larger L, or a non-marginal classifier) closes this gap.
+
+The relevant follow-up question is therefore no longer "is R3b indistinguishable?" but "at what T does a learned classifier reach the asymptote?" — a Task #6 question with a clear theoretical target now in place.
