@@ -3,3 +3,4 @@
 __pycache__/
 *env/
 data/r1_sequences/
+data/classifier_dataset/
