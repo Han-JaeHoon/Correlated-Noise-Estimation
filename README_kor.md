@@ -679,3 +679,67 @@ Plot: [d_scaling_T200_N2000_main.png](data/analysis/8_seq_separability/d_scaling
 §14에서 R3b marginal-Bayes 24-class 정확도가 T=300에서도 ~0.10에 머문 건 *식별 가능성의 구조적 한계가 아님* — 분포 자체는 distinguishable. plateau은 24-way 동시 식별 시 finite-T 인공물: pair별 분리 정보율은 L=1에서 ~0.005–0.011 nat/round, 24-class에서 신뢰성 있게 분리하려면 log(24) ≈ 3.18 nat의 pairwise 정보가 필요. T = 300에서 worst pair는 300 × 0.005 ≈ 1.5 nat — 임계값 아래라서 plateau이 됨. T를 더 늘리거나, L을 늘리거나, non-marginal classifier를 쓰면 이 gap을 메울 수 있음.
 
 따라서 후속 질문은 더 이상 "R3b가 indistinguishable인가?"가 아니라 "학습 classifier가 어느 T에서 asymptote에 도달하는가?" — 명확한 이론 목표가 정해진 Task #6 질문.
+
+
+---
+
+## 16. Task #6 — Sequence classifier (진행 중)
+
+§15에서 R3b sequence 분포가 모든 (k, k′) pair에 대해 충분히 긴 T에서 distinguishable임을 확인. 헤드라인 미해결 질문은 **학습된 classifier가 실제로 per-class accuracy → 1을 달성하는가**. Task #6은 그 classifier를 만들고 세 reference에 대해 benchmark:
+
+1. **Random baseline** = 1/24 ≈ 0.042
+2. **R1 ceiling** (analytic, §13) = per-class 0.75, group 1.0 — R1 sequence에 대한 어떤 classifier도 못 넘는 한계
+3. **R3b sequence-level ceiling** (§15) — T → ∞에서 per-class → 1, pairwise log-LR이 √t로 누적
+
+Scenario 이름을 decoder 의미를 명시하는 방향으로 재정리:
+
+| Scenario | Decoder | 의미 |
+|---|---|---|
+| **R1** | `IdentityDecoder` — 보정 없음 | 원래 §13 셋팅; data qubit Pauli frame 누적 |
+| **R2** (다음 commit에서 추가) | `PhenomDecoder` — single-data-qubit Pauli hypothesis | 표준 surface code 식 phenomenological decoder: (data qubit q, Pauli P ∈ {X,Y,Z}) → 27 entries lookup |
+| **R3b** | `LookupDecoder` — single-CNOT-fault hypothesis | §14에서 24 × 15 single-fault lookup으로 빌드한 circuit-level decoder |
+
+(원래 R3b의 "b"는 변형 여지로 두었던 것; R2는 미사용이었는데 phenomenological 변형에 적합해 채용.)
+
+### 16.1 빌드된 인프라
+
+| 파일 | 역할 |
+|---|---|
+| [src/seq_classifier.py](src/seq_classifier.py) | `VanillaRNN` / `GRUClassifier` / `TransformerClassifier` (default 기준 ≈ 28 K / 78 K / 118 K 파라미터), `SyndromeEncoder` (`raw` 8-bit 선형 또는 `byte` 256-token embedding), `ModelConfig` + `build_model` registry |
+| [scripts/build_classifier_dataset.py](scripts/build_classifier_dataset.py) | scenario × 24 class × T_max=1000 train/val/test 시퀀스 생성, 결정론 seed split |
+| [scripts/train_seq_classifier.py](scripts/train_seq_classifier.py) | 단일 cell trainer (model × scenario × T): AdamW + CosineLR + val early stopping, MPS/CUDA/CPU 자동 선택, held-out test에서 per-class + group accuracy |
+| [scripts/sweep_classifiers.py](scripts/sweep_classifiers.py) | (model × scenario × T) grid orchestrator; `sweep_summary.csv`로 통합 |
+| [scripts/analyze_classifier_sweep.py](scripts/analyze_classifier_sweep.py) | Sweep-수준 plot: `accuracy_vs_T`, `per_class_bars`, `confusion_grid` |
+| [scripts/visualize_classifier_dataset.py](scripts/visualize_classifier_dataset.py) | 학습 전 데이터 sanity check: 대표 sample heatmap, 클래스 평균 event rate, 24-class fingerprint summary |
+
+PyTorch 2.12 + MPS 백엔드 `correst_env/`에 설치.
+
+### 16.2 생성된 데이터셋
+
+R1과 R3b 둘 다 `(p_bg, p_high) = (0.01, 0.1)`, reset 모드, symbolic Pauli-frame simulator (`src/fast_simulator.py`) 사용. 생성 시간 각 ≈ 36분.
+
+| Scenario | Train | Val | Test | T_max | 총 sample | NPZ 크기 |
+|---|---|---|---|---|---|---|
+| R1 | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 48 MB |
+| R3b | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 50 MB |
+
+`data/classifier_dataset/` 아래 저장 (gitignore — seed로 재생성 가능).
+
+### 16.3 데이터 preview (qualitative 관찰)
+
+[scripts/visualize_classifier_dataset.py](scripts/visualize_classifier_dataset.py)가 preview 3 그림 + 요약 CSV를 [data/analysis/9_classifier/dataset_preview/](data/analysis/9_classifier/dataset_preview/) 아래 생성. 학습 전 핵심 관찰:
+
+- **R1 syndrome은 saturated**: 평균 라운드당 3.96개 event (8 bit 중) — 약 50 % bit density. IdentityDecoder가 data qubit Pauli frame을 누적시키면, 수십 라운드 안에 stabilizer 측정이 거의 uniform random처럼 보임. k를 구분하는 신호는 그 50 % 노이즈 위의 *미세한 drift*.
+- **R3b syndrome은 더 sparse**: 평균 3.17 event/round (≈ 40 %). LookupDecoder가 frame을 부분 복원해서 더 뚜렷한 class fingerprint 노출. 단 X-stab interior 그룹 (G3 = {18, 19, 20})은 여전히 50 % 근처.
+- **클래스 fingerprint 구조**: round + sample 평균에서 모든 R3b 클래스가 stab별 rate signature 다름; ambiguity 그룹 ({6, 7}, {14, 15, 17}, {18, 19, 20}, {22, 23})의 row들은 *시각적으로 유사하지만 동일 아님* — §15가 정량화한 작은 차이.
+- **Total event count는 분간 불가**: 24개 클래스의 mean total event는 두 시나리오에서 ~2% 안에 모임. 분간은 전적으로 *어떤 stab이 *언제* 점화하는가*에서.
+
+### 16.4 현재 상태
+
+인프라 준비 + R1/R3b 데이터셋 + preview qualitative 검증 완료. 다음:
+
+1. `PhenomDecoder` 추가 + R2 데이터셋 생성
+2. 첫 cell 학습: GRU on R3b, T=300 — §14 marginal-Bayes 0.10 plateau를 깰까? §15 projection ceiling에 얼마나 가까이?
+3. (model × scenario × T) sweep
+
+실험 진행에 따라 결과/plot/논의가 추가됨.

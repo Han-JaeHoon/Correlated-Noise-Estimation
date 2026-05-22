@@ -14,18 +14,18 @@ sequence만 보고 식별 가능한가**를 분석하는 연구. 현재 작업 �
 **`long-sequence-analysis`** — main 브랜치의 single-shot frame을
 sequence-level로 reframe한 **R1 시나리오**.
 
-## 2. 현재 위치 (2026-05-21 갱신, 2회차)
+## 2. 현재 위치 (2026-05-22 갱신, 3회차)
 
-활성 브랜치: **`decoder-add-analysis`** (R3b 분석 + sequence-level 분리 검증 완료, README §14+§15).
+활성 브랜치: **`decoder-add-analysis`** (§14, §15 분석 + §16 classifier 인프라 + R1/R3b 데이터셋 완료, R2 phenom decoder 데이터 생성 직전).
 이전 작업 보존 브랜치: `long-sequence-analysis` (commit `701680f` 기준).
 
 ```
 main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis)
                                           │
-                                          └─ … ─ 1501889 ─ NEW  (decoder-add-analysis)
-                                                  ↑       ↑
-                                                  §14    §15: sequence-level separability
-                                                          (data/analysis/8_seq_separability/)
+                                          └─ … ─ 25e409b ─ NEW  (decoder-add-analysis)
+                                                  ↑      ↑
+                                                  §14   §16 classifier 인프라
+                                                  §15    + R1/R3b 데이터셋 + preview
 ```
 
 | 단계 | 상태 | 무엇이 됐나 |
@@ -34,12 +34,23 @@ main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis
 | Sanity check (Phase 1.5) | ✅ | main single-shot 결과 비트 단위 재현 |
 | Task #3 R1 ceiling (Phase 2) | ✅ | 4 구조적 ambiguity 그룹 발견 (§13) |
 | Task #7 R3b 디코더 (Phase 6) | ✅ | §13.7 가설: directional TRUE / quantitative FALSE (§14) |
-| **Task #7b sequence-level 분리** | ✅ | **R3b 분포가 모든 (k,k′) pair에서 distinguishable, Cohen's d ∝ √t scaling, T_required(d=2) ≈ 400–2200** (§15) |
-| Task #5 본 데이터셋 (Phase 4) | ⏸ pending (unblocked) | |
-| Task #6 분류기 (Phase 5) | ⏸ pending (unblocked) — 이제 theoretical target 명확 | |
+| Task #7b sequence-level 분리 | ✅ | R3b 분포가 모든 (k,k′) pair에서 distinguishable, Cohen's d ∝ √t scaling, T_required(d=2) ≈ 400–2200 (§15) |
+| **Task #6 분류기 인프라 (Phase 5a)** | ✅ | **RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R3b 데이터셋 (72K seq 각, T_max=1000) (§16)** |
+| **R2 phenom decoder 데이터셋** | 진행 중 | `PhenomDecoder` 추가 + R2 데이터 생성 |
+| 분류기 학습 (Phase 5b) | ⏸ pending — 첫 cell GRU on R3b, T=300 | |
+| Task #5 본 데이터셋 (Phase 4) | classifier dataset이 사실상 대체 | |
 
 이전에 있던 Task #4 (72-pair sequence 운명)는 Task #3에 흡수돼서 별도 진행
-불필요. Task #2 (파라미터 픽)는 R3b 결과 봤으니 진행 가능.
+불필요. Task #2 (파라미터 픽)는 §15 결과 + classifier 작업으로 sweet spot
+(p_bg, p_high) = (0.01, 0.1)로 사실상 확정.
+
+## 2.5 시나리오 명명 규칙 (3회차 정리)
+
+| Scenario | Decoder | 의미 |
+|---|---|---|
+| **R1** | `IdentityDecoder` | 보정 없음, frame 누적. §13의 원래 셋팅 |
+| **R2** | `PhenomDecoder` | 표준 surface-code식 phenomenological — 9 data qubit × 3 Pauli = 27 hypothesis. (R2 자리가 비어 있어서 이쪽에 할당) |
+| **R3b** | `LookupDecoder` | §14에서 빌드한 circuit-level — 24 CNOT × 15 Pauli pair = 360 hypothesis |
 
 ## 3. 핵심 발견 1 — Task #3 ceiling
 
@@ -102,16 +113,13 @@ README §13.5.
 
 ## 4. 다음 step 추천 순서
 
-§15 결과로 우선순위 재정렬:
+§16 인프라 + R1/R3b 데이터까지 끝났음. 다음:
 
-1. **Task #6 분류기 (Phase 5)** ★ — 이제 theoretical target이 명확:
-   - **24-class accuracy → 1**이 도달 가능 (sequence-level ceiling = 1).
-   - L=1 marginal-Bayes (= §14 plateau)는 *하한*. 더 똑똑한 classifier (multi-step likelihood, GRU/Transformer)가 더 잘 해야 함.
-   - benchmark: T sweep으로 accuracy curve를 §15의 projected √t 외삽과 비교.
-2. **Task #5 본 데이터셋 (Phase 4)** — Task #6 학습용. 24 faulty_cnot × T sweep × N.
-   - §15의 T_required 값을 보고 T grid 선정: e.g. T ∈ {100, 300, 1000, 3000}로 worst pair까지 cover.
-3. **(선택) L=2/3 marginal-Bayes 확장** — §15.6의 "더 큰 L"을 ablation 차원에서. L 늘릴 때 plateau가 얼마나 위로 올라가는지 측정하면 classifier에 필요한 model capacity의 directional 가이드.
-4. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window, restricted pool. 더 효율적인 sequence-level 분리.
+1. **R2 phenom decoder 데이터셋 생성** ★ (지금) — `PhenomDecoder` 클래스 추가 + R2 데이터 ~40분 생성. *현재 진행 중*.
+2. **첫 classifier cell**: GRU on R3b, T = 300 — §14의 marginal-Bayes 0.10 plateau을 깨는지 확인. 학습 ~5분.
+3. **3-scenario × 3-model × 3-T sweep** — 18 cells. R1/R2/R3b 비교, RNN/GRU/Transformer 비교, T ∈ {100, 300, 1000}. 총 학습 시간 ~3-9시간 (모델·T에 따라). MPS 가속.
+4. **(선택) 더 큰 T (예: T=2000) 1-cell** — §15의 worst-pair T_required ≈ 2170 인근에서 실측 vs projection 비교.
+5. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window. 더 효율적인 sequence-level 분리.
 
 ## 5. 핵심 파일 맵
 
@@ -132,7 +140,13 @@ README §13.5.
 | `src/fast_simulator.py` | propagator-only sequence simulator (~100× faster than PennyLane runner, bit-identical) |
 | `src/ceiling_r3b.py` | MC marginal-Bayes ceiling estimator |
 
-**스크립트:**
+**코드 (§16 classifier 단계):**
+| 파일 | 역할 |
+|---|---|
+| `src/seq_classifier.py` | RNN/GRU/Transformer 모델 정의 + SyndromeEncoder + build_model registry |
+| `src/decoder.py` | (기존) IdentityDecoder, LookupDecoder, HammingNearestDecoder + (추가될) PhenomDecoder |
+
+**스크립트 (이전 단계):**
 | 파일 | 역할 |
 |---|---|
 | `scripts/sanity_check_r1_infra.py` | R1 회귀 테스트 (먼저 돌릴 것) |
@@ -148,12 +162,23 @@ README §13.5.
 | `scripts/analyze_seq_separability_extra.py` | §15 보조: self-baseline JS + 누적 log-LR |
 | `scripts/analyze_d_scaling.py` | §15 trajectory: Cohen's d(t) + √t fit + projection |
 
+**스크립트 (§16 classifier):**
+| 파일 | 역할 |
+|---|---|
+| `scripts/build_classifier_dataset.py` | scenario × 24 class × T_max=1000 학습 데이터 생성 |
+| `scripts/train_seq_classifier.py` | 단일 (model, scenario, T) cell 학습 + held-out test 평가 |
+| `scripts/sweep_classifiers.py` | (model × scenario × T) grid orchestrator |
+| `scripts/analyze_classifier_sweep.py` | sweep-수준 plot (accuracy vs T, per-class bars, confusion grid) |
+| `scripts/visualize_classifier_dataset.py` | 학습 전 데이터 sanity check 시각화 |
+
 **산출물:**
 | 경로 | 내용 |
 |---|---|
 | `data/analysis/6_sequence_ceiling/` | R1 ceiling: lookup, 그룹 json, sweep CSV, curves PNG |
 | `data/analysis/7_r3b_ceiling/` | R3b ceiling: marginals npz, R1 vs R3b CSV, group-별 plot, within-group spread CSV, JS divergence CSV |
 | `data/analysis/8_seq_separability/` | §15: pairwise JS NPZ + summary CSV + heatmaps, self-baseline + net JS, 누적 log-LR + Cohen's d trajectory + √t projection |
+| `data/analysis/9_classifier/dataset_preview/` | §16: 학습 전 데이터 sanity 시각화 (single_samples_T100, mean_event_rate_T200, per_stab_rate_all24, fault_counts_summary CSV) |
+| `data/classifier_dataset/` | R1/R3b/R2 NPZ train/val/test (gitignore — seed로 재생성 가능) |
 | `docs/r3b_design.md` | R3b decoder/runner 의 정식 spec |
 | `NIGHT_LOG.md` | 2026-05-20 밤샘 작업의 시간순 진행 로그 (R3b 인프라 + 분석 통째) |
 
@@ -164,10 +189,11 @@ README §13.5.
 
 ## 6. 환경 + 운영 메모
 
-- **Python 가상환경**: `source syndrome_env/bin/activate` (`syndrome_env/`은
-  `.gitignore`에 있음, 새 환경에서는 `python -m venv syndrome_env` + `pip
-  install -r requirements.txt` 로 재구축)
-- **의존성**: PennyLane, numpy, matplotlib, stim
+- **Python 가상환경**: `source correst_env/bin/activate` (HANDOFF 이전 버전에선
+  `syndrome_env`로 적혀 있었지만 실제 사용 중인 venv는 `correst_env`. 새 환경에서는
+  `python -m venv correst_env` + `pip install -r requirements.txt` 로 재구축, 그 후
+  PyTorch는 `pip install torch` 별도)
+- **의존성**: PennyLane, numpy, matplotlib, PyTorch (2.12+, MPS 백엔드 지원)
 - **macOS 노이즈**: `.DS_Store`, `*.pyc`는 `.gitignore`에 있지만 과거에
   트래킹된 잔여물이 `git status`에 보일 수 있음 — **새 commit에 포함하지
   말 것**

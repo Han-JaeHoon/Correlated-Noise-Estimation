@@ -685,3 +685,67 @@ Concretely:
 §14 reported R3b marginal-Bayes 24-class accuracy plateauing around 0.10 even at T = 300. §15 shows that plateau is *not* a structural ceiling on identification — the underlying distributions are distinguishable. The plateau is a finite-T artifact of attempting 24-way discrimination simultaneously: per-pair separation is ~0.005–0.011 nat per round at L=1, and 24-way discrimination needs log(24) ≈ 3.18 nat of pairwise information to be reliable. At T = 300 the worst pair has only 300 × 0.005 ≈ 1.5 nat — below threshold for that pair, hence the plateau. Larger T (or larger L, or a non-marginal classifier) closes this gap.
 
 The relevant follow-up question is therefore no longer "is R3b indistinguishable?" but "at what T does a learned classifier reach the asymptote?" — a Task #6 question with a clear theoretical target now in place.
+
+
+---
+
+## 16. Task #6 — Sequence classifier (in progress)
+
+§15 established that the R3b sequence distributions are distinguishable across all (k, k′) at sufficient T; the headline open question is whether a learned classifier can in fact reach the per-class accuracy → 1 ceiling that §15 projects. Task #6 builds that classifier and benchmarks it against three reference lines:
+
+1. **Random baseline** = 1/24 ≈ 0.042
+2. **R1 ceiling** (analytic, §13) = per-class 0.75, group 1.0 — the maximum any classifier can achieve on R1 sequences
+3. **R3b sequence-level ceiling** (§15) — per-class → 1 as T → ∞, with √t-rate accumulation in pairwise log-LR
+
+Scenarios are now named with explicit decoder semantics:
+
+| Scenario | Decoder | What it represents |
+|---|---|---|
+| **R1** | `IdentityDecoder` — no correction | original §13 setting; data-qubit Pauli frame accumulates |
+| **R2** (added in next commit) | `PhenomDecoder` — single-data-qubit Pauli hypothesis | standard surface-code-style phenomenological decoding: lookup of (data qubit q, Pauli P ∈ {X,Y,Z}) → 27 entries |
+| **R3b** | `LookupDecoder` — single-CNOT-fault hypothesis | circuit-level decoder built in §14 from the 24 × 15 single-fault lookup |
+
+(Originally R3b's "b" left room for variants; R2 was unassigned and is now adopted for the phenomenological variant.)
+
+### 16.1 Infrastructure built
+
+| File | Role |
+|---|---|
+| [src/seq_classifier.py](src/seq_classifier.py) | `VanillaRNN` / `GRUClassifier` / `TransformerClassifier` (≈ 28 K / 78 K / 118 K parameters at default), `SyndromeEncoder` with `raw` (8-bit linear) or `byte` (256-token embedding) input, `ModelConfig` + `build_model` registry |
+| [scripts/build_classifier_dataset.py](scripts/build_classifier_dataset.py) | Generate train/val/test sequences per scenario × 24 classes × T_max=1000 with deterministic seed splits |
+| [scripts/train_seq_classifier.py](scripts/train_seq_classifier.py) | One-cell trainer (model × scenario × T): AdamW + CosineLR + early stopping on val, MPS/CUDA/CPU device auto-selection, per-class + group accuracy on held-out test |
+| [scripts/sweep_classifiers.py](scripts/sweep_classifiers.py) | Orchestrator over (model × scenario × T) grid; aggregates into `sweep_summary.csv` |
+| [scripts/analyze_classifier_sweep.py](scripts/analyze_classifier_sweep.py) | Sweep-level plots: `accuracy_vs_T`, `per_class_bars`, `confusion_grid` |
+| [scripts/visualize_classifier_dataset.py](scripts/visualize_classifier_dataset.py) | Pre-training data sanity check: representative sample heatmaps, class-averaged event rate, 24-class fingerprint summary |
+
+PyTorch 2.12 with MPS backend installed in `correst_env/`.
+
+### 16.2 Dataset generated
+
+Both R1 and R3b at `(p_bg, p_high) = (0.01, 0.1)`, reset mode, with the symbolic Pauli-frame simulator (`src/fast_simulator.py`). Generation time ≈ 36 min per scenario.
+
+| Scenario | Train | Val | Test | T_max | total samples | NPZ size |
+|---|---|---|---|---|---|---|
+| R1 | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 48 MB |
+| R3b | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 50 MB |
+
+Stored under `data/classifier_dataset/` (gitignored — regenerable from seed).
+
+### 16.3 Dataset preview (qualitative findings)
+
+[scripts/visualize_classifier_dataset.py](scripts/visualize_classifier_dataset.py) produced three preview plots and one summary CSV under [data/analysis/9_classifier/dataset_preview/](data/analysis/9_classifier/dataset_preview/). Key observations before training begins:
+
+- **R1 syndromes saturate**: average 3.96 events/round (out of 8 possible) — about 50 % bit density. The IdentityDecoder lets the data-qubit Pauli frame accumulate, and after a few tens of rounds the stabilizer measurements look effectively uniformly random. The signal that discriminates k is a tiny drift on top of that 50 % noise.
+- **R3b syndromes are sparser**: average 3.17 events/round (≈ 40 %). The LookupDecoder partially restores the frame and exposes a more visible class fingerprint, though not for the X-stab interior groups (G3 = {18, 19, 20} stays at 50 %).
+- **Class fingerprint structure**: averaged over rounds + samples, every R3b class has a distinct per-stabilizer rate signature; ambiguity-group rows (e.g. {6, 7}, {14, 15, 17}, {18, 19, 20}, {22, 23}) are *visibly similar to each other* but not identical — the small differences are what §15 quantified.
+- **Total event count does not discriminate**: per-class mean total events across all 24 classes lie within ~2 % of each other for both scenarios. Discrimination is entirely in *which stab fires when*.
+
+### 16.4 Status
+
+Infrastructure ready, datasets for R1 and R3b in place, preview confirms expected qualitative structure. Next:
+
+1. Add `PhenomDecoder` and generate the R2 dataset.
+2. First-cell training: GRU on R3b, T = 300 — does the model break the §14 marginal-Bayes 0.10 plateau? How close to the §15-projected ceiling does it get?
+3. Sweep across (model, scenario, T).
+
+Results, plots, and discussion will be appended as the experiments complete.
