@@ -212,3 +212,110 @@ class HammingNearestDecoder(LookupDecoder):
         x_corr = self._residuals[k, alpha, 0].copy()
         z_corr = self._residuals[k, alpha, 1].copy()
         return Correction(x_correction=x_corr, z_correction=z_corr)
+
+
+class PhenomDecoder(Decoder):
+    """
+    Phenomenological surface-code decoder — the "textbook" choice.
+
+    Hypothesis space: a single Pauli error (X, Y, or Z) on exactly one of the
+    9 data qubits, present at the start of the round. 9 × 3 = 27 candidate
+    hypotheses (vs LookupDecoder's 24 × 15 = 360 circuit-level hypotheses).
+
+    For each (q, P), the syndrome that this single data-qubit error would
+    produce is determined by simple Pauli commutation with each stabilizer:
+        * X_q  ⇒  bit set on every Z stabilizer containing q
+        * Z_q  ⇒  bit set on every X stabilizer containing q
+        * Y_q  ⇒  union of both
+    (Equivalent to running the round circuit symbolically with no faults and
+    starting frame = single Pauli on q. We use the propagator for code
+    consistency, but it agrees with the direct commutation derivation.)
+
+    Decode action per round:
+      1. If observed d_t = 0: identity correction.
+      2. If d_t equals some σ_{q, P} in the lookup: pick lex-min (q, P) among
+         matches, apply P to data qubit q as the correction (Paulis are
+         self-inverse, so applying P again undoes the hypothesized error in
+         the data-qubit Pauli frame).
+      3. Else (multi-qubit error pattern not explained by any single-qubit
+         hypothesis): identity fallback.
+
+    This is the canonical phenomenological decoder. It uses no knowledge of
+    where in the round circuit a fault might have occurred — only the
+    Pauli-commutation relationship between errors and stabilizers. Real
+    matching-based decoders (MWPM, union-find) are more sophisticated
+    versions of the same idea, but with the same hypothesis space.
+    """
+
+    # 3 single-qubit Pauli candidates per data qubit
+    _PAULIS = ("X", "Y", "Z")
+
+    def __init__(self, reset: bool = True, n: int = n_data):
+        from collections import defaultdict
+        from .pauli_frame import PauliFrame
+        from .round_propagation import propagate_round_with_syndrome
+        from .surface_code_layout import n_qubits
+
+        self._n = int(n)
+        self._reset = bool(reset)
+        n_paulis = len(self._PAULIS)
+
+        # (9, 3) -> 8-bit syndrome lookup (packed int) and (9, 3, 2) data-qubit
+        # correction (x_correction, z_correction restricted to qubit q)
+        syn_lookup = np.zeros((n, n_paulis), dtype=np.int64)
+        correction_xz = np.zeros((n, n_paulis, 2), dtype=np.uint8)
+
+        for q in range(n):
+            for ai, pauli in enumerate(self._PAULIS):
+                start = PauliFrame(n=n_qubits)
+                start.apply_pauli(pauli, q)
+                _, syn = propagate_round_with_syndrome(
+                    start, [], reset_after_measure=reset,
+                )
+                packed = int(np.dot(syn.astype(np.int64), 1 << np.arange(syn.size)))
+                syn_lookup[q, ai] = packed
+                # Correction = the same Pauli applied to the same qubit
+                # (Paulis are self-inverse; this undoes the hypothesized error
+                # when XORed into the frame).
+                if pauli == "X":
+                    correction_xz[q, ai] = (1, 0)
+                elif pauli == "Z":
+                    correction_xz[q, ai] = (0, 1)
+                else:  # Y
+                    correction_xz[q, ai] = (1, 1)
+
+        self._syn_lookup = syn_lookup
+        self._correction_xz = correction_xz
+
+        # Inverse syndrome → list of (q, ai); lex-min tie-break
+        inverse = defaultdict(list)
+        for q in range(n):
+            for ai in range(n_paulis):
+                inverse[int(syn_lookup[q, ai])].append((q, ai))
+        self._lex_min = {s: min(v) for s, v in inverse.items()}
+        self._all_matches = {s: sorted(v) for s, v in inverse.items()}
+
+    @property
+    def window_size(self) -> int:
+        return 1
+
+    @property
+    def syndrome_lookup(self) -> np.ndarray:
+        """(9, 3) packed-int lookup — exposed for diagnostics / tests."""
+        return self._syn_lookup
+
+    def decode_window(self, detection_events: np.ndarray) -> Correction:
+        d = np.asarray(detection_events[0], dtype=np.int64).reshape(-1)
+        if d.size != 8:
+            raise ValueError(f"PhenomDecoder expects 8-bit detection event, got size {d.size}")
+        s = int(np.dot(d, 1 << np.arange(d.size)))
+
+        if s == 0 or s not in self._lex_min:
+            return Correction.identity(self._n)
+
+        q, ai = self._lex_min[s]
+        x_corr = np.zeros(self._n, dtype=np.uint8)
+        z_corr = np.zeros(self._n, dtype=np.uint8)
+        x_corr[q] = self._correction_xz[q, ai, 0]
+        z_corr[q] = self._correction_xz[q, ai, 1]
+        return Correction(x_correction=x_corr, z_correction=z_corr)

@@ -33,12 +33,13 @@ import numpy as np
 
 from src.ceiling_r3b import N_CNOT, simulate_class_sequences
 from src.config import DATA_DIR
-from src.decoder import IdentityDecoder, LookupDecoder
+from src.decoder import IdentityDecoder, LookupDecoder, PhenomDecoder
 
 
 SCENARIOS = {
     "r1": "identity",      # R1: no decoder, sequence_runner Identity fast path
-    "r3b": "lookup",       # R3b: window=1 LookupDecoder
+    "r2": "phenom",        # R2: phenomenological — 9×3 single-data-qubit-Pauli lookup
+    "r3b": "lookup",       # R3b: window=1 circuit-level LookupDecoder (24×15 fault)
 }
 
 
@@ -62,6 +63,8 @@ def generate_scenario(
         decoder = IdentityDecoder()
     elif decoder_kind == "lookup":
         decoder = LookupDecoder(reset=True)
+    elif decoder_kind == "phenom":
+        decoder = PhenomDecoder(reset=True)
     else:
         raise ValueError(decoder_kind)
 

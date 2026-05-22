@@ -36,7 +36,7 @@ from typing import Optional
 import numpy as np
 
 from .ceiling import N_STAB, N_SYN
-from .decoder import HammingNearestDecoder, IdentityDecoder, LookupDecoder
+from .decoder import HammingNearestDecoder, IdentityDecoder, LookupDecoder, PhenomDecoder
 from .fast_simulator import run_sequence_symbolic
 from .sequence_runner import run_sequence
 from .stochastic_faults import BackgroundElevatedSampler
@@ -87,6 +87,8 @@ def simulate_class_sequences(
             decoder = LookupDecoder(reset=reset_after_measure)
         elif decoder_kind == "hamming":
             decoder = HammingNearestDecoder(reset=reset_after_measure)
+        elif decoder_kind == "phenom":
+            decoder = PhenomDecoder(reset=reset_after_measure)
         else:
             raise ValueError(f"unknown decoder_kind {decoder_kind!r}")
 
@@ -167,6 +169,8 @@ def build_class_marginals(
         decoder = LookupDecoder(reset=True)
     elif decoder_kind == "hamming":
         decoder = HammingNearestDecoder(reset=True)
+    elif decoder_kind == "phenom":
+        decoder = PhenomDecoder(reset=True)
     else:
         raise ValueError(f"unknown decoder_kind {decoder_kind!r}")
     for k in range(N_CNOT):
