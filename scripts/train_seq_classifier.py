@@ -18,6 +18,7 @@ Outputs (under `data/analysis/9_classifier/{scenario}/{model}_T{T}/`):
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 import time
@@ -78,10 +79,14 @@ def epoch_pass(model, loader, optim, loss_fn, device, train: bool):
     ctx = torch.enable_grad() if train else torch.no_grad()
     with ctx:
         for x, y in loader:
+            # x to device non-blocking (float data, safe).
+            # y kept on CPU — MPS non_blocking label transfers can produce
+            # stale reads leading to wildly wrong accuracy on Apple Silicon.
+            # Loss function receives y via blocking .to(device).
             x = x.to(device, non_blocking=True)
-            y = y.to(device, non_blocking=True)
+            y_dev = y.to(device)          # blocking — labels must be ready
             logits = model(x)
-            loss = loss_fn(logits, y)
+            loss = loss_fn(logits, y_dev)
             if train:
                 optim.zero_grad()
                 loss.backward()
@@ -89,7 +94,8 @@ def epoch_pass(model, loader, optim, loss_fn, device, train: bool):
                 nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 optim.step()
             total_loss += loss.item() * x.size(0)
-            total_correct += (logits.argmax(dim=1) == y).sum().item()
+            # Compare on CPU to avoid MPS int64 comparison quirks
+            total_correct += (logits.argmax(dim=1).cpu() == y).sum().item()
             total_n += x.size(0)
     return total_loss / total_n, total_correct / total_n
 
@@ -143,7 +149,7 @@ def get_device(arg: str) -> torch.device:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--model", required=True, choices=["rnn", "gru", "transformer"])
-    ap.add_argument("--scenario", required=True, choices=["r1", "r3b"])
+    ap.add_argument("--scenario", required=True, choices=["r1", "r2", "r3b"])
     ap.add_argument("--T", type=int, required=True)
     ap.add_argument("--data-dir", type=Path,
                     default=DATA_DIR / "classifier_dataset")
@@ -253,7 +259,9 @@ def main():
 
         if improved:
             best_val = val_acc
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            # deepcopy keeps tensors on the same device — avoids potential
+            # CPU↔MPS round-trip issues in load_state_dict on Apple Silicon.
+            best_state = copy.deepcopy(model.state_dict())
             metrics["best_val_acc"] = float(best_val)
             metrics["best_epoch"] = int(epoch)
             patience_left = args.patience

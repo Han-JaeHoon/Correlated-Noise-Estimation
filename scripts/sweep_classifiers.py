@@ -96,8 +96,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--models", nargs="+", default=["rnn", "gru", "transformer"],
                     choices=["rnn", "gru", "transformer"])
-    ap.add_argument("--scenarios", nargs="+", default=["r1", "r3b"],
-                    choices=["r1", "r3b"])
+    ap.add_argument("--scenarios", nargs="+", default=["r1", "r2", "r3b"],
+                    choices=["r1", "r2", "r3b"])
     ap.add_argument("--T", nargs="+", type=int, default=[100, 300, 1000])
 
     ap.add_argument("--epochs", type=int, default=30)
