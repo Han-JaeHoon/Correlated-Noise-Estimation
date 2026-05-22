@@ -57,8 +57,8 @@ def main():
     ap.add_argument("--out-root", type=Path,
                     default=DATA_DIR / "analysis" / "9_classifier")
     ap.add_argument("--models", nargs="+", default=["rnn", "gru", "transformer"])
-    ap.add_argument("--scenarios", nargs="+", default=["r1", "r3b"])
-    ap.add_argument("--T", nargs="+", type=int, default=[100, 300, 1000])
+    ap.add_argument("--scenarios", nargs="+", default=["r1", "r2", "r3b"])
+    ap.add_argument("--T", nargs="+", type=int, default=[128, 512])
     args = ap.parse_args()
 
     import matplotlib.pyplot as plt
@@ -79,16 +79,119 @@ def main():
         print("[error] no cell metrics found — run the sweep first")
         return
 
-    # ----- accuracy_vs_T.png -----
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.5), sharey=True)
     model_colors = {"rnn": "#d62728", "gru": "#1f77b4", "transformer": "#2ca02c"}
-    line_styles = {"r1": "-", "r3b": "--"}
-    for ax_idx, sc in enumerate(args.scenarios):
-        ax = axes[ax_idx]
+    T_colors = {128: "#1f77b4", 512: "#ff7f0e", 100: "#1f77b4", 300: "#ff7f0e", 1000: "#2ca02c"}
+    sc_colors = {"r1": "#1f77b4", "r2": "#ff7f0e", "r3b": "#2ca02c"}
+
+    # ------------------------------------------------------------------ #
+    # 1. TRAINING CURVES — loss and accuracy per epoch                     #
+    # Layout: scenarios (rows) × models (cols), two sub-rows each         #
+    # (top = loss, bottom = accuracy), T values as line colors             #
+    # ------------------------------------------------------------------ #
+    T_styles = {t: s for t, s in zip(sorted(set(args.T)), ["-", "--", ":", "-."])}
+
+    # (a) loss curves
+    n_sc = len(args.scenarios)
+    n_mo = len(args.models)
+    fig, axes = plt.subplots(
+        n_sc, n_mo, figsize=(5.5 * n_mo, 3.5 * n_sc),
+        squeeze=False,
+        gridspec_kw={"hspace": 0.45, "wspace": 0.30},
+    )
+    for si, sc in enumerate(args.scenarios):
+        for mi, mo in enumerate(args.models):
+            ax = axes[si, mi]
+            any_plotted = False
+            for T in sorted(args.T):
+                res = load_cell(root, sc, mo, T)
+                if res is None:
+                    continue
+                m, _ = res
+                ep_data = m.get("epochs", [])
+                if not ep_data:
+                    continue
+                eps = [e["epoch"] for e in ep_data]
+                tr_loss = [e["train_loss"] for e in ep_data]
+                vl_loss = [e["val_loss"] for e in ep_data]
+                col = T_colors.get(T, "black")
+                ax.plot(eps, tr_loss, color=col, ls="-", lw=1.5,
+                        label=f"T={T} train")
+                ax.plot(eps, vl_loss, color=col, ls="--", lw=1.0,
+                        alpha=0.7, label=f"T={T} val")
+                any_plotted = True
+            if not any_plotted:
+                ax.text(0.5, 0.5, "no data", ha="center", va="center",
+                        transform=ax.transAxes, color="gray")
+            ax.set_title(f"{sc.upper()} / {mo}", fontsize=10)
+            ax.set_xlabel("epoch")
+            ax.set_ylabel("cross-entropy loss")
+            ax.set_ylim(bottom=0)
+            ax.grid(alpha=0.3)
+            ax.legend(fontsize=7, loc="upper right", ncol=1)
+    fig.suptitle("Training & validation loss per epoch", fontsize=12)
+    out = root / "training_curves_loss.png"
+    plt.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close()
+    print(f"[saved] {out}")
+
+    # (b) accuracy curves
+    fig, axes = plt.subplots(
+        n_sc, n_mo, figsize=(5.5 * n_mo, 3.5 * n_sc),
+        squeeze=False,
+        gridspec_kw={"hspace": 0.45, "wspace": 0.30},
+    )
+    for si, sc in enumerate(args.scenarios):
+        for mi, mo in enumerate(args.models):
+            ax = axes[si, mi]
+            any_plotted = False
+            for T in sorted(args.T):
+                res = load_cell(root, sc, mo, T)
+                if res is None:
+                    continue
+                m, _ = res
+                ep_data = m.get("epochs", [])
+                if not ep_data:
+                    continue
+                eps = [e["epoch"] for e in ep_data]
+                tr_acc = [e["train_acc"] for e in ep_data]
+                vl_acc = [e["val_acc"] for e in ep_data]
+                col = T_colors.get(T, "black")
+                ax.plot(eps, tr_acc, color=col, ls="-", lw=1.5,
+                        label=f"T={T} train")
+                ax.plot(eps, vl_acc, color=col, ls="--", lw=1.0,
+                        alpha=0.7, label=f"T={T} val")
+                any_plotted = True
+            if not any_plotted:
+                ax.text(0.5, 0.5, "no data", ha="center", va="center",
+                        transform=ax.transAxes, color="gray")
+            ax.axhline(1.0 / 24, color="gray", lw=0.7, ls=":", label="random")
+            if sc == "r1":
+                ax.axhline(0.75, color="black", lw=0.7, ls=":",
+                           label="R1 ceiling 0.75")
+            if sc in ("r2", "r3b"):
+                ax.axhline(0.10, color="black", lw=0.7, ls=":",
+                           label="marginal-Bayes ~0.10")
+            ax.set_ylim(0, 1.05)
+            ax.set_title(f"{sc.upper()} / {mo}", fontsize=10)
+            ax.set_xlabel("epoch")
+            ax.set_ylabel("accuracy")
+            ax.grid(alpha=0.3)
+            ax.legend(fontsize=7, loc="lower right", ncol=1)
+    fig.suptitle("Training & validation accuracy per epoch", fontsize=12)
+    out = root / "training_curves_acc.png"
+    plt.savefig(out, dpi=140, bbox_inches="tight")
+    plt.close()
+    print(f"[saved] {out}")
+
+    # ------------------------------------------------------------------ #
+    # 2. accuracy_vs_T.png  (test accuracy × T, one panel per scenario)   #
+    # ------------------------------------------------------------------ #
+    fig, axes = plt.subplots(1, n_sc, figsize=(5.5 * n_sc, 5.5),
+                             sharey=True, squeeze=False)
+    axes = axes[0]
+    for ax, sc in zip(axes, args.scenarios):
         for mo in args.models:
-            Ts = []
-            overall = []
-            group = []
+            Ts, overall, group = [], [], []
             for T in sorted(args.T):
                 if (sc, mo, T) in cells:
                     m = cells[(sc, mo, T)][0]
@@ -97,17 +200,16 @@ def main():
                     group.append(m["test_group_acc"])
             if Ts:
                 ax.plot(Ts, overall, marker="o", color=model_colors[mo],
-                        ls="-", label=f"{mo} overall")
+                        ls="-", lw=1.5, label=f"{mo} overall")
                 ax.plot(Ts, group, marker="s", color=model_colors[mo],
-                        ls="--", alpha=0.6, label=f"{mo} group")
-        # reference lines
-        ax.axhline(1.0 / 24, color="gray", lw=0.5, ls=":", label="random 1/24")
+                        ls="--", lw=1.0, alpha=0.65, label=f"{mo} group")
+        ax.axhline(1.0 / 24, color="gray", lw=0.7, ls=":", label="random 1/24")
         if sc == "r1":
-            ax.axhline(0.75, color="black", lw=0.7, ls=":", label="R1 per-class ceiling 0.75")
-            ax.axhline(1.0, color="black", lw=0.7, ls="-", alpha=0.3, label="group ceiling 1.0")
-        if sc == "r3b":
-            ax.axhline(0.10, color="black", lw=0.7, ls=":", label="R3b L=1 marginal-Bayes plateau ~0.10")
-            ax.axhline(1.0, color="black", lw=0.7, ls="-", alpha=0.3, label="sequence-level ceiling (§15)")
+            ax.axhline(0.75, color="black", lw=0.8, ls=":",
+                       label="R1 per-class ceiling 0.75")
+        if sc in ("r2", "r3b"):
+            ax.axhline(0.10, color="black", lw=0.8, ls=":",
+                       label="marginal-Bayes plateau ~0.10")
         ax.set_xlabel("T (sequence length)")
         ax.set_ylabel("Test accuracy")
         ax.set_title(f"Scenario: {sc.upper()}")
@@ -115,19 +217,23 @@ def main():
         ax.set_ylim(0, 1.05)
         ax.grid(alpha=0.3, which="both")
         ax.legend(fontsize=7, loc="best")
-    plt.suptitle("Task #6: dominant-CNOT identification — model × scenario × T")
+    plt.suptitle("Task #6: dominant-CNOT identification — test accuracy vs T")
     plt.tight_layout()
     out = root / "accuracy_vs_T.png"
     plt.savefig(out, dpi=140)
     plt.close()
     print(f"[saved] {out}")
 
-    # ----- per_class bar charts at largest T (one row per scenario) -----
+    # ------------------------------------------------------------------ #
+    # 3. per_class bar charts at largest T                                 #
+    # ------------------------------------------------------------------ #
     T_max = max(args.T)
-    fig, axes = plt.subplots(2, len(args.models), figsize=(5 * len(args.models), 7),
-                              sharey=True)
-    if len(args.models) == 1:
-        axes = axes.reshape(2, 1)
+    fig, axes = plt.subplots(n_sc, n_mo,
+                              figsize=(5 * n_mo, 3.5 * n_sc),
+                              sharey=True,
+                              gridspec_kw={"hspace": 0.55, "wspace": 0.15})
+    if n_sc == 1:
+        axes = axes.reshape(1, n_mo)
     for sci, sc in enumerate(args.scenarios):
         for mi, mo in enumerate(args.models):
             ax = axes[sci, mi]
@@ -137,33 +243,41 @@ def main():
             m, _ = cells[(sc, mo, T_max)]
             per_class = np.array(m["test_per_class_acc"])
             ks = np.arange(24)
-            ax.bar(ks, per_class, color=model_colors[mo])
-            # shade ambiguity groups
+            ax.bar(ks, per_class, color=model_colors[mo], width=0.7)
             for gi, g in enumerate(R1_AMBIG_GROUPS):
                 ax.axvspan(min(g) - 0.5, max(g) + 0.5, alpha=0.15,
                            color=["#fde", "#dfe", "#def", "#fed"][gi % 4],
                            zorder=0)
+            ax.axhline(1.0 / 24, color="gray", lw=0.7, ls=":")
             ax.set_xticks(ks)
-            ax.set_xticklabels(ks, fontsize=7)
+            ax.set_xticklabels(ks, fontsize=6)
             ax.set_ylim(0, 1.05)
-            ax.set_title(f"{sc.upper()} / {mo} @ T={T_max}\n"
-                         f"overall={m['test_overall_acc']:.3f}  group={m['test_group_acc']:.3f}",
-                         fontsize=9)
-            ax.set_xlabel("CNOT index k")
+            ax.set_title(
+                f"{sc.upper()} / {mo} @ T={T_max}\n"
+                f"overall={m['test_overall_acc']:.3f}  "
+                f"group={m['test_group_acc']:.3f}",
+                fontsize=9,
+            )
+            ax.set_xlabel("CNOT index k", fontsize=8)
             if mi == 0:
                 ax.set_ylabel("per-class accuracy")
             ax.grid(axis="y", alpha=0.3)
-    plt.tight_layout()
+    plt.suptitle(f"Per-class test accuracy @ T={T_max}", fontsize=12)
     out = root / "per_class_bars.png"
-    plt.savefig(out, dpi=140)
+    plt.savefig(out, dpi=140, bbox_inches="tight")
     plt.close()
     print(f"[saved] {out}")
 
-    # ----- confusion grid (3 cols of models × 2 rows of scenarios) -----
-    fig, axes = plt.subplots(2, len(args.models), figsize=(5 * len(args.models), 9),
-                              sharex=True, sharey=True)
-    if len(args.models) == 1:
-        axes = axes.reshape(2, 1)
+    # ------------------------------------------------------------------ #
+    # 4. confusion matrix grid                                             #
+    # ------------------------------------------------------------------ #
+    fig, axes = plt.subplots(n_sc, n_mo,
+                              figsize=(4.5 * n_mo, 4.5 * n_sc),
+                              sharex=True, sharey=True,
+                              gridspec_kw={"hspace": 0.40, "wspace": 0.15})
+    if n_sc == 1:
+        axes = axes.reshape(1, n_mo)
+    last_im = None
     for sci, sc in enumerate(args.scenarios):
         for mi, mo in enumerate(args.models):
             ax = axes[sci, mi]
@@ -175,16 +289,18 @@ def main():
                 ax.axis("off")
                 continue
             row_norm = conf.astype(np.float64) / conf.sum(axis=1, keepdims=True).clip(min=1)
-            im = ax.imshow(row_norm, cmap="viridis", vmin=0, vmax=1)
+            last_im = ax.imshow(row_norm, cmap="viridis", vmin=0, vmax=1)
             ax.set_title(f"{sc.upper()} / {mo} @ T={T_max}", fontsize=9)
-            if sci == 1:
-                ax.set_xlabel("predicted k")
+            if sci == n_sc - 1:
+                ax.set_xlabel("predicted k", fontsize=8)
             if mi == 0:
-                ax.set_ylabel("true k")
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.7)
-    plt.suptitle(f"Test confusion at T={T_max} (row-normalized)")
+                ax.set_ylabel("true k", fontsize=8)
+    if last_im is not None:
+        fig.colorbar(last_im, ax=axes.ravel().tolist(), shrink=0.6,
+                     label="fraction of true-class samples")
+    plt.suptitle(f"Test confusion matrix @ T={T_max} (row-normalized)", fontsize=12)
     out = root / "confusion_grid.png"
-    plt.savefig(out, dpi=140)
+    plt.savefig(out, dpi=140, bbox_inches="tight")
     plt.close()
     print(f"[saved] {out}")
 
