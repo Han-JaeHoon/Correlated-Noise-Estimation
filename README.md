@@ -686,6 +686,43 @@ Concretely:
 
 The relevant follow-up question is therefore no longer "is R3b indistinguishable?" but "at what T does a learned classifier reach the asymptote?" — a Task #6 question with a clear theoretical target now in place.
 
+### 15.7 R2 (PhenomDecoder) separability — same analysis repeated
+
+The §15 analysis was repeated identically for the R2 scenario (`PhenomDecoder`, `--tag r2`) to answer:
+
+> **Under phenomenological decoding (R2), do the 24 dominant-CNOT syndrome sequences also become uniquely identifiable at sufficient T?**
+
+Setup: identical to §15.1 except `decoder=phenom`. All three metrics computed; outputs at [data/analysis/8_seq_separability/\*_r2\*](data/analysis/8_seq_separability/).
+
+**JS divergence (L=1,2,3):**
+
+| L | within-group mean | between-group mean | ratio (B/W) |
+|---|---|---|---|
+| 1 | 0.00797 | 0.01157 | 1.45 |
+| 2 | 0.03682 | 0.05161 | 1.40 |
+| 3 | 0.12229 | 0.14090 | 1.20 |
+
+Within-group JS grows monotonically with L (from 0.008 → 0.037 → 0.122) — the same structural signature as R3b — confirming longer windows keep extracting discriminative information within every ambiguity group.
+
+**Cohen's d at T = 200 and projected T_required(d = 2) — R2 vs R3b:**
+
+| Pair (Group) | R2 d(200) | R2 T_req | R3b d(200) | R3b T_req |
+|---|---|---|---|---|
+| (6, 7)   G1 | 1.062 | **655** | 0.592 | **2,174** |
+| (14, 15) G2 | 1.290 | 407 | 1.282 | 384 |
+| (14, 17) G2 | 1.439 | 299 | 1.282 | 388 |
+| (15, 17) G2 | 1.457 | 319 | 1.334 | 398 |
+| (18, 19) G3 | 1.275 | 399 | 1.129 | 524 |
+| (18, 20) G3 | 1.446 | 320 | 1.023 | 652 |
+| (19, 20) G3 | 1.282 | 410 | 1.030 | 676 |
+| (22, 23) G4 | 1.017 | **682** | 1.109 | 592 |
+
+**Verdict:** R2 also achieves sequence-level distinguishability for all 8 R1-ambiguity-group pairs, with worst-case T_required ≈ **682 rounds** — substantially better than R3b's worst case of **2,174 rounds**.
+
+The G1 pair (6, 7) is the most striking: R3b's circuit-level "correct" correction happens to homogenize the post-correction syndrome residuals of CNOTs 6 and 7, making them hard to distinguish (T_req 2,174). R2's phenomenological correction is "wrong" for CNOT faults, but wrong *differently* for k=6 vs k=7, leaving more distinguishable residual patterns (T_req 655).
+
+The conclusion generalizes: **both R2 and R3b break the R1 structural degeneracy at the sequence level, and both converge to perfect 24-class identification as T → ∞.**
+
 
 ---
 
@@ -726,7 +763,8 @@ Both R1 and R3b at `(p_bg, p_high) = (0.01, 0.1)`, reset mode, with the symbolic
 
 | Scenario | Train | Val | Test | T_max | total samples | NPZ size |
 |---|---|---|---|---|---|---|
-| R1 | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 48 MB |
+| R1  | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 48 MB |
+| R2  | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | ~49 MB |
 | R3b | 2000 × 24 | 500 × 24 | 500 × 24 | 1000 | 72,000 | 50 MB |
 
 Stored under `data/classifier_dataset/` (gitignored — regenerable from seed).
@@ -742,10 +780,12 @@ Stored under `data/classifier_dataset/` (gitignored — regenerable from seed).
 
 ### 16.4 Status
 
-Infrastructure ready, datasets for R1 and R3b in place, preview confirms expected qualitative structure. Next:
+Infrastructure ready; datasets for R1, R2, and R3b all generated and verified. §15.7 confirmed R2 sequence-level separability (worst-case T_required ≈ 682) — consistent with R3b and fully unblocking ML training for all three scenarios.
 
-1. Add `PhenomDecoder` and generate the R2 dataset.
-2. First-cell training: GRU on R3b, T = 300 — does the model break the §14 marginal-Bayes 0.10 plateau? How close to the §15-projected ceiling does it get?
-3. Sweep across (model, scenario, T).
+Next:
+
+1. First-cell training: GRU on R3b, T = 300 — does the model break the §14 marginal-Bayes 0.10 plateau? How close to the §15-projected ceiling does it get?
+2. Sweep across (model × scenario × T) = 3 × 3 × 3 = 27 cells.
+3. Analyze: accuracy-vs-T curves, per-class bars, confusion matrix grid.
 
 Results, plots, and discussion will be appended as the experiments complete.

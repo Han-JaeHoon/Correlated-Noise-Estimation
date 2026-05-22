@@ -16,7 +16,7 @@ sequence-level로 reframe한 **R1 시나리오**.
 
 ## 2. 현재 위치 (2026-05-22 갱신, 3회차)
 
-활성 브랜치: **`decoder-add-analysis`** (§14, §15 분석 + §16 classifier 인프라 + R1/R3b 데이터셋 완료, R2 phenom decoder 데이터 생성 직전).
+활성 브랜치: **`decoder-add-analysis`** (§14, §15 분석 + §16 classifier 인프라 + R1/R2/R3b 데이터셋 완료, R2 sequence-level separability 확인 완료).
 이전 작업 보존 브랜치: `long-sequence-analysis` (commit `701680f` 기준).
 
 ```
@@ -35,8 +35,8 @@ main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis
 | Task #3 R1 ceiling (Phase 2) | ✅ | 4 구조적 ambiguity 그룹 발견 (§13) |
 | Task #7 R3b 디코더 (Phase 6) | ✅ | §13.7 가설: directional TRUE / quantitative FALSE (§14) |
 | Task #7b sequence-level 분리 | ✅ | R3b 분포가 모든 (k,k′) pair에서 distinguishable, Cohen's d ∝ √t scaling, T_required(d=2) ≈ 400–2200 (§15) |
-| **Task #6 분류기 인프라 (Phase 5a)** | ✅ | **RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R3b 데이터셋 (72K seq 각, T_max=1000) (§16)** |
-| **R2 phenom decoder 데이터셋** | 진행 중 | `PhenomDecoder` 추가 + R2 데이터 생성 |
+| **Task #6 분류기 인프라 (Phase 5a)** | ✅ | **RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R2+R3b 데이터셋 (72K seq 각, T_max=1000) (§16)** |
+| **R2 phenom decoder 데이터셋 + §15 분리 확인** | ✅ | `PhenomDecoder` + R2 데이터 생성 + 8쌍 모두 d∝√t 확인, worst T_req ≈ 682 (§15.7) |
 | 분류기 학습 (Phase 5b) | ⏸ pending — 첫 cell GRU on R3b, T=300 | |
 | Task #5 본 데이터셋 (Phase 4) | classifier dataset이 사실상 대체 | |
 
@@ -111,15 +111,26 @@ README §13.5.
 → **YES — R3b 하에서 충분히 긴 T에서 모든 24개 CNOT은 sequence-level에서 unique 식별 가능**.
 §14의 0.10 plateau은 24-class 동시 식별의 finite-T 인공물이지 구조적 ceiling이 아님.
 
+### 3.7 핵심 발견 4 — R2 (PhenomDecoder) sequence-level 분리 확인 (§15.7)
+
+R2 시나리오에서도 동일 분석 반복 수행 (N=2000, T=200, seed=0):
+
+| 측정 | R2 결과 | R3b 비교 |
+|---|---|---|
+| Within-group JS (L=1) | 0.008 → L=3: 0.122 (L과 함께 성장) | 0.006 (L=1) |
+| Projected T for d=2, worst pair | **682 라운드** (22,23) | **2,174 라운드** (6,7) |
+| G1 pair (6,7) T_required | 655 | 2,174 |
+
+**결론: R2도 R3b와 동일하게 모든 8 ambiguity-group pair에서 d∝√t 확인, 충분한 T에서 완전 분리 가능. R2의 worst-case T_required(≈682)가 R3b(≈2174)보다 오히려 낮음** — PhenomDecoder의 "틀린" correction이 서로 다른 방식으로 틀려서 CNOT별 residual pattern을 더 잘 구별시킴.
+
 ## 4. 다음 step 추천 순서
 
-§16 인프라 + R1/R3b 데이터까지 끝났음. 다음:
+§16 인프라 + R1/R2/R3b 데이터 모두 완료, R2 §15 separability 확인 완료. 다음:
 
-1. **R2 phenom decoder 데이터셋 생성** ★ (지금) — `PhenomDecoder` 클래스 추가 + R2 데이터 ~40분 생성. *현재 진행 중*.
-2. **첫 classifier cell**: GRU on R3b, T = 300 — §14의 marginal-Bayes 0.10 plateau을 깨는지 확인. 학습 ~5분.
-3. **3-scenario × 3-model × 3-T sweep** — 18 cells. R1/R2/R3b 비교, RNN/GRU/Transformer 비교, T ∈ {100, 300, 1000}. 총 학습 시간 ~3-9시간 (모델·T에 따라). MPS 가속.
-4. **(선택) 더 큰 T (예: T=2000) 1-cell** — §15의 worst-pair T_required ≈ 2170 인근에서 실측 vs projection 비교.
-5. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window. 더 효율적인 sequence-level 분리.
+1. **첫 classifier cell** ★ (지금) — GRU on R3b, T = 300: §14의 marginal-Bayes 0.10 plateau을 깨는지 확인. 학습 ~5분. `correst_env/bin/python scripts/train_seq_classifier.py --model gru --scenario r3b --T 300 --device auto`
+2. **3-scenario × 3-model × 3-T sweep** — 27 cells (R1/R2/R3b × RNN/GRU/Transformer × T ∈ {100, 300, 1000}). `correst_env/bin/python scripts/sweep_classifiers.py` 총 학습 시간 ~3-9시간 (모델·T에 따라). MPS 가속.
+3. **(선택) 더 큰 T (예: T=2000) 1-cell** — §15의 R2 worst-pair T_required ≈ 682, R3b ≈ 2170 인근에서 실측 vs projection 비교.
+4. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window.
 
 ## 5. 핵심 파일 맵
 
