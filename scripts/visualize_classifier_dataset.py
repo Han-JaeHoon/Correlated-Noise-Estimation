@@ -73,19 +73,22 @@ def all_per_class(syndromes, labels, k):
 
 def plot_single_samples(scenarios_data, out_path, T_show=100):
     """
-    Figure 1: 5 classes × 2 scenarios = 10 panels in a (5, 2) grid.
+    Figure 1: 5 classes × N_scenarios panels.
     Each panel is a (8, T_show) heatmap of one example sample.
     """
     import matplotlib.pyplot as plt
 
+    scenarios = [s for s in ["r1", "r2", "r3b"] if s in scenarios_data]
+    n_cols = len(scenarios)
     fig, axes = plt.subplots(
-        len(REPRESENTATIVE_CLASSES), 2,
-        figsize=(11, 1.6 * len(REPRESENTATIVE_CLASSES)),
+        len(REPRESENTATIVE_CLASSES), n_cols,
+        figsize=(5.5 * n_cols, 1.6 * len(REPRESENTATIVE_CLASSES)),
         sharey=True,
+        squeeze=False,
     )
 
     for row, (k, tag, title) in enumerate(REPRESENTATIVE_CLASSES):
-        for col, scenario in enumerate(["r1", "r3b"]):
+        for col, scenario in enumerate(scenarios):
             ax = axes[row, col]
             syn, lab = scenarios_data[scenario]
             sample = first_per_class(syn, lab, k, count=1)[0]  # (T_max, 8)
@@ -124,11 +127,14 @@ def plot_mean_event_rate(scenarios_data, out_path, T_show=200):
     """
     import matplotlib.pyplot as plt
 
+    scenarios = [s for s in ["r1", "r2", "r3b"] if s in scenarios_data]
+    n_cols = len(scenarios)
     n_rows = len(REPRESENTATIVE_CLASSES)
     fig, axes = plt.subplots(
-        n_rows, 2,
-        figsize=(16, 2.2 * n_rows),
+        n_rows, n_cols,
+        figsize=(8 * n_cols, 2.2 * n_rows),
         sharey=True,
+        squeeze=False,
         gridspec_kw={"hspace": 0.55, "wspace": 0.05},
     )
 
@@ -136,7 +142,7 @@ def plot_mean_event_rate(scenarios_data, out_path, T_show=200):
     vmaxs = []
     panels = []
     for k, tag, title in REPRESENTATIVE_CLASSES:
-        for scenario in ["r1", "r3b"]:
+        for scenario in scenarios:
             syn, lab = scenarios_data[scenario]
             class_samples = all_per_class(syn, lab, k)
             rate = class_samples[:, :T_show, :].mean(axis=0).T  # (8, T_show)
@@ -145,8 +151,8 @@ def plot_mean_event_rate(scenarios_data, out_path, T_show=200):
     vmax = max(vmaxs)
 
     for idx, (k, tag, title, scenario, rate) in enumerate(panels):
-        row = idx // 2
-        col = idx % 2
+        row = idx // n_cols
+        col = idx % n_cols
         ax = axes[row, col]
         im = ax.imshow(rate, aspect="auto", cmap="magma",
                        vmin=0, vmax=vmax, interpolation="nearest")
@@ -184,8 +190,9 @@ def plot_per_stab_rate_all24(scenarios_data, out_path):
     """
     import matplotlib.pyplot as plt
 
+    scenarios = [s for s in ["r1", "r2", "r3b"] if s in scenarios_data]
     rates = {}
-    for scenario in ["r1", "r3b"]:
+    for scenario in scenarios:
         syn, lab = scenarios_data[scenario]
         # shape (24, 8)
         mat = np.zeros((24, 8), dtype=np.float64)
@@ -194,10 +201,13 @@ def plot_per_stab_rate_all24(scenarios_data, out_path):
             mat[k] = class_samples.mean(axis=(0, 1))   # avg over samples & rounds
         rates[scenario] = mat
 
-    vmax = max(rates["r1"].max(), rates["r3b"].max())
+    vmax = max(m.max() for m in rates.values())
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6.5), sharey=True)
-    for ax, scenario in zip(axes, ["r1", "r3b"]):
+    n_cols = len(scenarios)
+    fig, axes = plt.subplots(1, n_cols, figsize=(7 * n_cols, 6.5),
+                              sharey=True, squeeze=False)
+    axes = axes[0]
+    for ax, scenario in zip(axes, scenarios):
         im = ax.imshow(rates[scenario], aspect="auto", cmap="magma",
                        vmin=0, vmax=vmax)
         ax.set_xticks(np.arange(8))
@@ -226,7 +236,8 @@ def plot_per_stab_rate_all24(scenarios_data, out_path):
 def emit_summary_csv(scenarios_data, out_path):
     """For each (scenario, k), mean+std of total detection events per sample."""
     lines = ["scenario,k,n_samples,T,mean_total_events,std_total_events,mean_per_round"]
-    for scenario in ["r1", "r3b"]:
+    scenarios = [s for s in ["r1", "r2", "r3b"] if s in scenarios_data]
+    for scenario in scenarios:
         syn, lab = scenarios_data[scenario]
         for k in range(24):
             cs = all_per_class(syn, lab, k)
@@ -254,10 +265,16 @@ def main():
 
     print(f"[load] {args.data_dir}")
     scenarios_data = {}
-    for scenario in ["r1", "r3b"]:
+    for scenario in ["r1", "r2", "r3b"]:
+        path = args.data_dir / f"{scenario}_train.npz"
+        if not path.exists():
+            print(f"  {scenario}: NPZ not found at {path}, skipping")
+            continue
         syn, lab = load_train_split(scenario, args.data_dir)
         scenarios_data[scenario] = (syn, lab)
         print(f"  {scenario}: syndromes {syn.shape} dtype={syn.dtype}  labels {lab.shape}")
+    if not scenarios_data:
+        raise SystemExit("[error] no scenario datasets found")
 
     plot_single_samples(scenarios_data, args.out_dir / "single_samples_T100.png", T_show=100)
     plot_mean_event_rate(scenarios_data, args.out_dir / "mean_event_rate_T200.png", T_show=200)

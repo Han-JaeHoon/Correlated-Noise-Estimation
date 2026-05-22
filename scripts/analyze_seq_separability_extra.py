@@ -40,7 +40,17 @@ import numpy as np
 
 from src.ceiling_r3b import N_CNOT, simulate_class_sequences
 from src.config import DATA_DIR
-from src.decoder import LookupDecoder
+from src.decoder import LookupDecoder, PhenomDecoder, IdentityDecoder
+
+
+def build_decoder(name: str):
+    if name == "lookup":
+        return LookupDecoder(reset=True), "lookup"
+    if name == "phenom":
+        return PhenomDecoder(reset=True), "phenom"
+    if name == "identity":
+        return IdentityDecoder(), "identity"
+    raise ValueError(f"unknown decoder: {name!r}")
 
 
 R1_AMBIG_GROUPS = [
@@ -90,8 +100,8 @@ def js_divergence_sparse(k1, p1, k2, p2) -> float:
     return float(js)
 
 
-def generate_all_classes(p_bg, p_high, T, n_samples, seed, verbose=False):
-    decoder = LookupDecoder(reset=True)
+def generate_all_classes(p_bg, p_high, T, n_samples, seed, decoder_name="lookup", verbose=False):
+    decoder, decoder_kind = build_decoder(decoder_name)
     rng_master = np.random.default_rng(seed)
     out = np.zeros((N_CNOT, n_samples, T, 8), dtype=np.uint8)
     t0 = time.time()
@@ -101,7 +111,7 @@ def generate_all_classes(p_bg, p_high, T, n_samples, seed, verbose=False):
         out[k] = simulate_class_sequences(
             k_dom=k, n_samples=n_samples, T=T,
             p_bg=p_bg, p_high=p_high,
-            decoder_kind="lookup", rng=rng_k, decoder=decoder,
+            decoder_kind=decoder_kind, rng=rng_k, decoder=decoder,
         )
         if verbose:
             print(f"  [gen] k={k:2d} ({time.time()-t0:.1f}s)")
@@ -251,18 +261,21 @@ def main():
     ap.add_argument("--tag", type=str, default="main")
     ap.add_argument("--skip-classifier", action="store_true")
     ap.add_argument("--skip-logLR", action="store_true")
+    ap.add_argument("--decoder", default="lookup",
+                    choices=["lookup", "phenom", "identity"])
     args = ap.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     L_list = sorted(set(args.L_list))
     tag = "_" + args.tag if args.tag else ""
 
-    print(f"[args] p_bg={args.p_bg} p_high={args.p_high} T={args.T} N={args.n_samples} L={L_list} seed={args.seed}")
+    print(f"[args] p_bg={args.p_bg} p_high={args.p_high} T={args.T} N={args.n_samples} L={L_list} seed={args.seed} decoder={args.decoder}")
     t0 = time.time()
     print("[gen] regenerating sequences with same seed for follow-up...")
     syndromes = generate_all_classes(
         p_bg=args.p_bg, p_high=args.p_high, T=args.T,
-        n_samples=args.n_samples, seed=args.seed, verbose=False,
+        n_samples=args.n_samples, seed=args.seed,
+        decoder_name=args.decoder, verbose=False,
     )
     print(f"[gen] done in {time.time()-t0:.1f}s")
 

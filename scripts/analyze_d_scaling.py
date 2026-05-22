@@ -29,7 +29,17 @@ import numpy as np
 
 from src.ceiling_r3b import N_CNOT, simulate_class_sequences
 from src.config import DATA_DIR
-from src.decoder import LookupDecoder
+from src.decoder import LookupDecoder, PhenomDecoder, IdentityDecoder
+
+
+def build_decoder(name: str):
+    if name == "lookup":
+        return LookupDecoder(reset=True), "lookup"
+    if name == "phenom":
+        return PhenomDecoder(reset=True), "phenom"
+    if name == "identity":
+        return IdentityDecoder(), "identity"
+    raise ValueError(f"unknown decoder: {name!r}")
 
 
 R1_AMBIG_GROUPS = [
@@ -40,8 +50,8 @@ R1_AMBIG_GROUPS = [
 ]
 
 
-def generate_all_classes(p_bg, p_high, T, n_samples, seed):
-    decoder = LookupDecoder(reset=True)
+def generate_all_classes(p_bg, p_high, T, n_samples, seed, decoder_name="lookup"):
+    decoder, decoder_kind = build_decoder(decoder_name)
     rng_master = np.random.default_rng(seed)
     out = np.zeros((N_CNOT, n_samples, T, 8), dtype=np.uint8)
     t0 = time.time()
@@ -51,7 +61,7 @@ def generate_all_classes(p_bg, p_high, T, n_samples, seed):
         out[k] = simulate_class_sequences(
             k_dom=k, n_samples=n_samples, T=T,
             p_bg=p_bg, p_high=p_high,
-            decoder_kind="lookup", rng=rng_k, decoder=decoder,
+            decoder_kind=decoder_kind, rng=rng_k, decoder=decoder,
         )
         print(f"  [gen] k={k:2d} ({time.time()-t0:.1f}s)")
     return out
@@ -123,15 +133,18 @@ def main():
     ap.add_argument("--out-dir", type=Path,
                     default=DATA_DIR / "analysis" / "8_seq_separability")
     ap.add_argument("--tag", type=str, default="main")
+    ap.add_argument("--decoder", default="lookup",
+                    choices=["lookup", "phenom", "identity"])
     args = ap.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     tag = "_" + args.tag if args.tag else ""
 
-    print(f"[args] p_bg={args.p_bg} p_high={args.p_high} T={args.T} N={args.n_samples} seed={args.seed}")
+    print(f"[args] p_bg={args.p_bg} p_high={args.p_high} T={args.T} N={args.n_samples} seed={args.seed} decoder={args.decoder}")
     print(f"[gen] regenerating ...")
     t0 = time.time()
-    syndromes = generate_all_classes(args.p_bg, args.p_high, args.T, args.n_samples, args.seed)
+    syndromes = generate_all_classes(args.p_bg, args.p_high, args.T, args.n_samples, args.seed,
+                                      decoder_name=args.decoder)
     print(f"[gen] done in {time.time()-t0:.1f}s")
 
     # build per-round (L=1) log marginals

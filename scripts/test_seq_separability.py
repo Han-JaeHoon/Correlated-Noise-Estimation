@@ -40,7 +40,17 @@ import numpy as np
 
 from src.ceiling_r3b import N_CNOT, simulate_class_sequences
 from src.config import DATA_DIR
-from src.decoder import LookupDecoder
+from src.decoder import LookupDecoder, PhenomDecoder, IdentityDecoder
+
+
+def build_decoder(name: str):
+    if name == "lookup":
+        return LookupDecoder(reset=True), "lookup"
+    if name == "phenom":
+        return PhenomDecoder(reset=True), "phenom"
+    if name == "identity":
+        return IdentityDecoder(), "identity"
+    raise ValueError(f"unknown decoder: {name!r}")
 
 
 R1_AMBIG_GROUPS = [
@@ -167,12 +177,13 @@ def generate_all_classes(
     T: int,
     n_samples: int,
     seed: int,
+    decoder_name: str = "lookup",
     verbose: bool = True,
 ) -> np.ndarray:
     """
     Returns: syndromes (24, n_samples, T, 8) uint8.
     """
-    decoder = LookupDecoder(reset=True)
+    decoder, decoder_kind = build_decoder(decoder_name)
     rng_master = np.random.default_rng(seed)
     out = np.zeros((N_CNOT, n_samples, T, 8), dtype=np.uint8)
     t0 = time.time()
@@ -185,7 +196,7 @@ def generate_all_classes(
             T=T,
             p_bg=p_bg,
             p_high=p_high,
-            decoder_kind="lookup",
+            decoder_kind=decoder_kind,
             rng=rng_k,
             decoder=decoder,
         )
@@ -285,6 +296,9 @@ def main():
                     help="optional suffix on output filenames")
     ap.add_argument("--save-raw", action="store_true",
                     help="save full (24, N, T, 8) syndromes (can be large)")
+    ap.add_argument("--decoder", default="lookup",
+                    choices=["lookup", "phenom", "identity"],
+                    help="decoder used in the simulator (R3b=lookup, R2=phenom, R1=identity)")
     args = ap.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -292,7 +306,7 @@ def main():
     tag = args.tag if not args.tag or args.tag.startswith("_") else "_" + args.tag
 
     print(f"[args] p_bg={args.p_bg} p_high={args.p_high} T={args.T} "
-          f"N={args.n_samples} L={L_list} seed={args.seed}")
+          f"N={args.n_samples} L={L_list} seed={args.seed} decoder={args.decoder}")
     print(f"[out]  {args.out_dir}")
 
     # 1. generate
@@ -300,6 +314,7 @@ def main():
     syndromes = generate_all_classes(
         p_bg=args.p_bg, p_high=args.p_high, T=args.T,
         n_samples=args.n_samples, seed=args.seed,
+        decoder_name=args.decoder,
     )
     gen_seconds = time.time() - t0
     print(f"[gen] done in {gen_seconds:.1f}s")
