@@ -4,3 +4,4 @@ __pycache__/
 *env/
 data/r1_sequences/
 data/classifier_dataset/
+!data/classifier_dataset/DATASET_README.md
