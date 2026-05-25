@@ -1,0 +1,13 @@
+category,mode,round,n_cases,zero_fraction
+A,reset,0,27,0.0
+A,reset,1,27,0.0
+A,reset,2,27,0.0
+A,noreset,0,27,0.0
+A,noreset,1,27,1.0
+A,noreset,2,27,0.0
+C,reset,0,360,0.2639
+C,reset,1,360,0.1556
+C,reset,2,360,0.1556
+C,noreset,0,360,0.2639
+C,noreset,1,360,0.2639
+C,noreset,2,360,0.2639

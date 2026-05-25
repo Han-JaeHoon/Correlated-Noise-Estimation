@@ -1,0 +1,5 @@
+label,n_cases,n_unique,n_silent,max_collision_size,n_singleton_classes,n_multi_classes,compression_ratio
+A_reset,27,23,0,2,19,4,0.8518518518518519
+A_noreset,27,23,0,2,19,4,0.8518518518518519
+C_reset,360,127,16,16,38,89,0.3527777777777778
+C_noreset,360,127,16,16,38,89,0.3527777777777778
