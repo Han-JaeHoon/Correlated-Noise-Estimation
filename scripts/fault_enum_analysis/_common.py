@@ -54,8 +54,9 @@ def load_table(path: Optional[Path] = None) -> dict:
 
     error = d["error"]
     mode = d["mode"]
-    syndrome = d["syndrome"]  # (774, 3, 8)
-    assert syndrome.shape == (len(error), N_ROUNDS, N_STAB), syndrome.shape
+    syndrome = d["syndrome"]  # (774, n_rounds, 8)
+    assert syndrome.ndim == 3 and syndrome.shape[0] == len(error) and syndrome.shape[2] == N_STAB, \
+        f"unexpected syndrome shape {syndrome.shape}"
 
     cat = np.empty(len(error), dtype="U1")
     qubit_or_cnot = np.full(len(error), -1, dtype=np.int32)

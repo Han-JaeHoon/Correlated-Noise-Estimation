@@ -789,3 +789,333 @@ Next:
 3. Analyze: accuracy-vs-T curves, per-class bars, confusion matrix grid.
 
 Results, plots, and discussion will be appended as the experiments complete.
+
+---
+
+## 17. Fault-enumeration pattern analysis (branch `fault-enumeration-analysis`)
+
+### 17.1 Motivation — 실장님's new direction
+
+After the R3b/R2 sequence-level results (§15, §15.7), a follow-up question
+was raised: **"What patterns do d-round syndrome measurements show as a
+function of the injected error, when looked at deterministically rather
+than statistically?"** §13–§16 are all stochastic — R1 marginalises over
+Pauli, R3b/R2 are MC. The fault-enumeration-table branch (commit
+`228d3a8`) had already built the deterministic counterpart: **387
+single-fault cases × 2 ancilla modes = 774 records**, each carrying the
+exact `(n_rounds=3, 8)` raw ancilla syndrome triggered by exactly one
+fault inserted at round 0.
+
+This section asks what that table directly reveals about syndrome
+geometry, and cross-checks against §13's R1 ambiguity-group claim.
+
+Code: [`scripts/fault_enum_analysis/`](scripts/fault_enum_analysis/).
+Outputs: [`data/analysis/10_fault_enumeration_patterns/`](data/analysis/10_fault_enumeration_patterns/).
+
+### 17.2 The 774-record table — recap
+
+Each record contains:
+
+| Field | Type | Notes |
+|---|---|---|
+| `error` | str | descriptor — `A:data{q}:{P}` (idle qubit Pauli) or `C:cnot{kk}:{PP}` (post-CNOT 2-qubit Pauli) |
+| `mode` | str | `reset` (ancilla measured + reset every round) or `noreset` |
+| `syndrome` | int8 (3, 8) | raw ancilla outcomes, stab order Z0..Z3, X0..X3 |
+
+Category counts: A = 27 (9 data × 3 single-qubit Pauli), C = 360 (24 CNOT × 15 nontrivial 2-qubit Pauli).
+
+### 17.3 Raw-syndrome collision structure
+
+Treating each record as a 24-bit string and grouping by exact equality:
+
+| Subset | # cases | # unique 24-bit syndromes | # silent (all-zero) | largest collision class | compression |
+|---|---|---|---|---|---|
+| A reset    |  27 |  23 |  0 |  2 | 0.852 |
+| A noreset  |  27 |  23 |  0 |  2 | 0.852 |
+| C reset    | 360 | 127 | 16 | 16 | 0.353 |
+| C noreset  | 360 | 127 | 16 | 16 | 0.353 |
+
+- **Category A is almost-injective**: 23 distinct syndromes for 27 idle-Pauli cases; the only collisions are 2-element classes (an X data-qubit fault is often equivalent to a Y on the same qubit through one round of ancilla mixing).
+- **Category C is heavily collisional**: 360 → 127 (compression 0.353). The largest 24-bit collision class has 16 members — a mix of CNOT × Pauli combinations all of whose 3-round detectoutput is bit-identical (i.e. silent in all three rounds).
+- **Reset and no-reset compress identically** — the toggle changes specific bit patterns (§17.6) but does not change how many equivalence classes the 360 cases collapse into.
+
+The 16-member silent class (raw all-zero 24-bit syndrome) is the most
+diagnostic structure: it contains exactly the (CNOT, Pauli) combinations
+whose post-CNOT 2-qubit residual is a stabilizer of the surface code at
+round 0 *and* whose subsequent frame evolution stays in the stabilizer
+group through rounds 1, 2.  Members include `cnot00:ZZ`, `cnot13:XI`,
+`cnot17:XI`, `cnot22:XX`, etc. — the 16 cases enumerated in
+`collision_groups_C_reset.csv`.
+
+Pairwise Hamming-distance heatmap (cases sorted by CNOT × Pauli) shows
+strong 15×15 block structure on the diagonal — every CNOT's 15 Paulis
+mostly cluster together — interrupted by occasional cross-CNOT
+collisions:
+
+- [hamming_distance_heatmap_C_reset.png](data/analysis/10_fault_enumeration_patterns/hamming_distance_heatmap_C_reset.png)
+- [hamming_distance_hist.png](data/analysis/10_fault_enumeration_patterns/hamming_distance_hist.png) (distribution of pairwise distances)
+
+### 17.4 Per-CNOT 15-Pauli uniqueness
+
+Per-CNOT count of distinct 24-bit syndromes across the 15 nontrivial Paulis (reset mode):
+
+| # distinct 24-bit syndromes | # CNOTs |
+|---|---|
+| 15 (fully discriminable) |  8 |
+|  8 (Pauli pool partitioned by 2:1 collisions) | 16 |
+
+So **8 of 24 CNOTs are fully discriminable across their 15 Paulis at the
+24-bit raw level** (CNOTs 1, 2, 9, 10, 16 and a few others), while 16
+CNOTs already collide internally — same CNOT, different Pauli, identical
+syndrome.  Visualised as a 6 × 4 grid of per-CNOT bitmap heatmaps
+(rows = 15 Paulis, columns = 24 syndrome bits):
+
+- [per_cnot_pauli_bitmap_reset.png](data/analysis/10_fault_enumeration_patterns/per_cnot_pauli_bitmap_reset.png)
+- [per_cnot_pauli_bitmap_noreset.png](data/analysis/10_fault_enumeration_patterns/per_cnot_pauli_bitmap_noreset.png)
+
+These plots are the most direct visual answer to "what does the syndrome
+look like as a function of the error" — for every (CNOT, Pauli) pair, the
+exact firing pattern across 3 rounds × 8 stabilizers.
+
+Full per-CNOT uniqueness table:
+[per_cnot_unique_syndromes_reset.csv](data/analysis/10_fault_enumeration_patterns/per_cnot_unique_syndromes_reset.csv).
+
+### 17.5 Round-by-round event pattern
+
+Averaging the per-(round, stabilizer) bit value over all cases in a (category, mode) cell:
+
+- [round_event_rate_heatmap.png](data/analysis/10_fault_enumeration_patterns/round_event_rate_heatmap.png) — 4 panels (Cat A/C × reset/noreset).
+
+Observations:
+
+- **Cat A reset:** every round has ~0.5 events on the X stabilizers measuring the affected data qubit, because the inserted data-qubit Pauli persists as a frame error and re-flags every round.
+- **Cat A noreset:** round 0 lights up normally, round 1 is **identically zero** (raw measurement equals the previous round's, so the unreset ancilla reads the same bit), round 2 lights up again. This is the cleanest demonstration of the no-reset mode's "differential" character on a deterministic input.
+- **Cat C reset:** the per-round zero-fraction drops from 26.4 % at round 0 to 15.6 % at rounds 1, 2 — reset clears some ancilla-driven correlations and surfaces additional discriminative bits in later rounds.
+- **Cat C noreset:** zero-fraction stays flat at 26.4 % across all three rounds.
+
+Full silent-round table: [round_zero_fraction.csv](data/analysis/10_fault_enumeration_patterns/round_zero_fraction.csv).
+
+Per-round total event rate (Cat C, reset vs noreset overlay):
+[reset_vs_noreset_round_event_rate.png](data/analysis/10_fault_enumeration_patterns/reset_vs_noreset_round_event_rate.png).
+
+### 17.6 Reset vs no-reset diff
+
+Pairing each of the 387 fault cases between modes:
+
+| Statistic | Cat A | Cat C |
+|---|---|---|
+| # bit-identical between modes | 0 / 27 | 16 / 360 (4.4 %) |
+| mean per-fault Hamming distance | 1.78 / 24 | 2.18 / 24 |
+| max per-fault Hamming distance | 4 | 4 |
+
+- **Round 0 mean per-fault Hamming = 0** (sanity — both modes share the
+  first measurement step).
+- **Round 1 ≈ 1.1 bits** and **round 2 ≈ 1.0 bits** mean divergence —
+  the mode toggle bleeds in slowly, never more than 4 of 24 bits per
+  fault.
+- The 16 mode-invariant Cat C faults are exactly the silent class of
+  §17.3.
+
+P(bit differs) heatmap localises the divergence per (round, stabilizer):
+[reset_vs_noreset_bit_diff_heatmap.png](data/analysis/10_fault_enumeration_patterns/reset_vs_noreset_bit_diff_heatmap.png).
+
+Per-round divergence curve:
+[reset_vs_noreset_per_round_hamming.png](data/analysis/10_fault_enumeration_patterns/reset_vs_noreset_per_round_hamming.png).
+
+Top-25 most mode-sensitive faults:
+[reset_vs_noreset_top_diff_faults.csv](data/analysis/10_fault_enumeration_patterns/reset_vs_noreset_top_diff_faults.csv).
+
+### 17.7 Detection-event view — direct deterministic confirmation of §13 and §15
+
+§13 defined the R1 ambiguity groups via the *per-round detection-event
+multiset* (XOR of consecutive raw rounds, with round 0 vs. a zero
+baseline). The enumeration table stores raw measurements, so we transform
+raw → detection event with
+
+  det[0] = raw[0]
+  det[t] = raw[t] XOR raw[t-1]   for t ≥ 1
+
+and compute multiset overlap of two views:
+
+- **Round-0 only (8-bit)** — bit-for-bit equivalent to §13's R1 lookup.
+- **All-rounds (24-bit)** — what an R3b/R2 sequence-level analysis sees.
+
+The result for the 4 R1 ambiguity groups (`{6,7}`, `{14,15,17}`,
+`{18,19,20}`, `{22,23}`):
+
+| Group | Pair (k, k′) | Round-0 overlap | All-rounds (24-bit) overlap |
+|---|---|---|---|
+| G1 | (6, 7)   | **1.000** | 0.467 |
+| G2 | (14, 15) | **1.000** | 0.200 |
+| G2 | (14, 17) | **1.000** | 0.200 |
+| G2 | (15, 17) | **1.000** | 0.200 |
+| G3 | (18, 19) | **1.000** | 0.200 |
+| G3 | (18, 20) | **1.000** | 0.200 |
+| G3 | (19, 20) | **1.000** | 0.200 |
+| G4 | (22, 23) | **1.000** | 0.467 |
+
+Two facts to take from this table:
+
+1. **Round-0 overlap = 1.000 for every R1 group, in both reset and
+   no-reset modes.** This is the cleanest possible direct confirmation
+   of §13.2 — the per-round detection-event multisets are bit-for-bit
+   identical for all four ambiguity groups, in a deterministic
+   enumeration that uses no Monte Carlo at all. The reported multisets
+   (`{0³, 2⁴, 32⁴, 34⁴}` for G1, etc., in
+   [detection_round0_multisets.csv](data/analysis/10_fault_enumeration_patterns/detection_round0_multisets.csv))
+   are literally the same as the `{0³, 4⁴, 64⁴, 68⁴}` quoted in §13.2,
+   modulo bit-ordering convention.
+
+2. **All-rounds overlap drops to 0.20–0.47.** The frame propagation in
+   rounds 1 and 2 carries discriminative information for *every* R1
+   ambiguity group, deterministically and per-Pauli — not just on
+   average. This is the deterministic twin of §15's per-round JS
+   divergence finding: §15 had to estimate via Monte Carlo that the
+   ambiguity-group marginals diverge after the decoder is applied;
+   §17.7 shows the same thing already happens at the **frame** level
+   (no decoder needed) when one looks past round 0.
+
+Heatmaps (R1 groups outlined in red, both modes):
+
+- [detection_round0_overlap_reset.png](data/analysis/10_fault_enumeration_patterns/detection_round0_overlap_reset.png) — the four diagonal red boxes are solid blue (overlap = 1)
+- [detection_allrounds_overlap_reset.png](data/analysis/10_fault_enumeration_patterns/detection_allrounds_overlap_reset.png) — the same red boxes are now mostly pale blue (overlap ≈ 0.2)
+- [detection_round0_overlap_noreset.png](data/analysis/10_fault_enumeration_patterns/detection_round0_overlap_noreset.png) / [detection_allrounds_overlap_noreset.png](data/analysis/10_fault_enumeration_patterns/detection_allrounds_overlap_noreset.png)
+- [r1_group_detection_check.csv](data/analysis/10_fault_enumeration_patterns/r1_group_detection_check.csv) — the exact numbers above
+
+### 17.8 What this means
+
+1. **§13's R1 ambiguity is a strictly round-0 phenomenon at the
+   syndrome-bit level.** No statistical argument is needed; the
+   multisets coincide bit-for-bit in 387-case deterministic
+   enumeration.
+2. **The ambiguity does *not* persist past round 0.** As soon as the
+   data-qubit frame from the round-0 fault propagates into a second
+   stabilizer round, the detection-event multisets become inequivalent
+   for every R1 ambiguity group — including G2/G3 (X-stab interior),
+   which §13.7 had conjectured would be the hardest. The "structural"
+   collapse is real for round 0 only.
+3. **This is consistent with §14 (R3b lookup decoder leaks group
+   information into rounds 1, 2 of the marginal) and §15 (the
+   sequence-level separability is positive for all R1 group pairs
+   under R3b/R2).** §17.7 is the *deterministic* mechanism that powers
+   the *statistical* signal those earlier sections measure.
+4. **For the surface-code research front:** the implication is that
+   any decoder or classifier with a multi-round window — even just
+   window = 3, as enumerated here — should in principle have access to
+   discriminative information that breaks every R1 ambiguity group.
+   The §14 R3b decoder fails to convert that information into 24-class
+   accuracy gains, but §15 / §17.7 jointly establish that the
+   information *is there in the data*; the gap is purely a
+   classifier-design problem.
+
+### 17.9 Resolved sub-questions
+
+The §17 first pass left three follow-ups. All are now answered.
+
+**Q1 — Does the "8-unique" CNOT set coincide with the R1-group members?**
+
+> **Answered: no.** Two cleanly-defined sets, partially overlapping.
+
+| Uniqueness bucket | CNOTs | R1-member overlap |
+|---|---|---|
+| 15 unique (24-bit raw, reset) | {1, 2, 9, 10, 15, 16, 19, 20} | 3 / 8 — only {15, 19, 20} |
+| 8 unique (24-bit raw, reset) | {0, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 17, 18, 21, 22, 23} | 7 / 16 — {6, 7, 14, 17, 18, 22, 23} |
+
+R1 members are split across both buckets (e.g. CNOT 15 has 15 unique
+24-bit syndromes for its 15 Paulis, even though it lies in R1 group G2
+with 14 and 17, which only have 8). The "8-unique" pattern reflects a
+*within-CNOT 2-to-1 Pauli collision* at the raw-24-bit level (7
+collision pairs + 1 singleton-silent), while the R1 ambiguity is a
+*between-CNOT 8-bit detection-event multiset coincidence* — different
+geometric facts. CNOTs 15, 19, 20 happen to fully resolve their own 15
+Paulis while still being indistinguishable from another CNOT's
+*multiset* of 15.
+
+**Q2 — Are the 16 mode-invariant Cat C faults the same as the 16
+silent (all-zero raw 24-bit) faults?**
+
+> **Answered: yes, exactly. 16 / 16 set equality, no symmetric
+> difference.**
+
+If a fault produces all-zero raw syndromes across rounds 0–2, there is
+literally nothing for the mode toggle to flip; conversely if a fault is
+mode-invariant the only way both modes can yield the same 24 bits is
+the trivial one (all zero), since any non-zero raw bit pattern in reset
+mode would be modified by the no-reset mode's carry-forward of the
+previous ancilla state. Both directions of the equivalence are
+geometric, not coincidental.
+
+**Q3 — Does the 24-bit detection-event overlap continue to shrink with
+larger `n_rounds`?**
+
+> **Answered: no — it saturates at T = 2.** See §17.10. This is the
+> most informative new result of the whole section.
+
+### 17.10 Overlap-vs-`n_rounds` scan — frame propagation is a one-shot effect
+
+The enumeration table was rebuilt at `n_rounds = 5` and the per-CNOT
+detection-event multiset overlap recomputed for every horizon
+`T ∈ {1, …, 5}`.  As a sanity check, the `T = 1, 2, 3` numbers from the
+n_rounds=5 table match the n_rounds=3 baseline bit-for-bit.
+
+| T | G1 | G2 | G3 | G4 | mean |
+|---|---|---|---|---|---|
+| 1 | 1.000 | 1.000 | 1.000 | 1.000 | **1.000** |
+| 2 | 0.467 | 0.200 | 0.200 | 0.467 | **0.333** |
+| 3 | 0.467 | 0.200 | 0.200 | 0.467 | 0.333 |
+| 4 | 0.467 | 0.200 | 0.200 | 0.467 | 0.333 |
+| 5 | 0.467 | 0.200 | 0.200 | 0.467 | 0.333 |
+
+Plot: [r1_group_overlap_vs_nrounds.png](data/analysis/10_fault_enumeration_patterns/r1_group_overlap_vs_nrounds.png).
+Full per-pair table:
+[r1_group_overlap_vs_nrounds.csv](data/analysis/10_fault_enumeration_patterns/r1_group_overlap_vs_nrounds.csv).
+
+This says something sharp that §15 could not see directly:
+
+> The deterministic frame propagation of a *single* round-0 fault
+> reveals its full multiset-discrimination signature in exactly **one**
+> additional round.  Beyond `T = 2`, no further information is added.
+
+Concretely: round 1's detection event already encodes the
+post-fault residual Pauli frame XOR'd against round 0's measurement.
+Round 2's detection event is then determined entirely by that frame's
+*re-measurement* by the same stabilizers — which produces a deterministic
+function of the frame and thus carries no new information at the
+multiset level.  The same holds for rounds 3, 4, 5: the system has
+entered a fixed-point under repeated noiseless rounds.
+
+What §15 measures is fundamentally different: in §15 a fresh stochastic
+fault is sampled every round, so each round contributes new
+distributional information and the cumulative log-LR grows as `√t`.
+The per-fault propagation contribution to that growth, in light of
+§17.10, is constant — a one-time `−0.667` overlap drop applied at
+round 1 of each new fault.  The `√t` scaling thus comes entirely from
+the **arrival rate** of new faults (`p_high + 23 · p_bg`), not from any
+slow accumulation within a single fault's lifetime.
+
+This refines the picture in two ways:
+
+1. **For the classifier (Task #6):** any architecture with window ≥ 2
+   already has access to the full deterministic per-fault information.
+   GRU / Transformer at large T does not gain by remembering the entire
+   sequence — it gains by *counting fault events* and *averaging their
+   one-shot signatures*.  This is a hint about what the inductive bias
+   should be (something like a Bernoulli-rate estimator over per-round
+   signatures, not a recurrent state that integrates over many rounds).
+
+2. **For the next experimental design:** if the goal is to break the
+   `(6, 7)` and `(22, 23)` pairs (overlap 0.467 — the hardest), the
+   right lever is not more rounds, but either (a) a smarter window
+   decoder that uses the *non-multiset* (i.e. Pauli-conditional)
+   structure, or (b) a different `(p_bg, p_high)` regime where multi-
+   fault rounds carry the discriminative weight.
+
+### 17.11 Cross-reference to earlier sections
+
+| Earlier finding | §17 deterministic counterpart |
+|---|---|
+| §13.2 R1 ambiguity groups via 8-bit detection-event multiset | §17.7: round-0 multiset overlap = 1.000 confirmed bit-for-bit |
+| §13.7 conjecture: decoder breaks groups via round-1 residual | §17.7, §17.10: overlap drops to 0.20–0.47 at T = 2, no decoder needed |
+| §14: R3b marginal-Bayes underperforms despite per-round JS > 0 | §17.10: per-fault information saturates at T = 2, classifier must aggregate over fault count |
+| §15: Cohen's d ∝ √t under R3b | §17.10: √t comes from fault arrival rate, not from within-fault propagation |
+| §15.7: PhenomDecoder breaks G1 better than LookupDecoder | §17.10: G1 overlap 0.467 — leaves more room for any decoder that uses non-multiset structure |
