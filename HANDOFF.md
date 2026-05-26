@@ -14,18 +14,19 @@ sequence만 보고 식별 가능한가**를 분석하는 연구. 현재 작업 �
 **`long-sequence-analysis`** — main 브랜치의 single-shot frame을
 sequence-level로 reframe한 **R1 시나리오**.
 
-## 2. 현재 위치 (2026-05-22 갱신, 3회차)
+## 2. 현재 위치 (2026-05-26 갱신, 4회차 — 야간 진행)
 
-활성 브랜치: **`decoder-add-analysis`** (§14, §15 분석 + §16 classifier 인프라 + R1/R2/R3b 데이터셋 완료, R2 sequence-level separability 확인 완료).
-이전 작업 보존 브랜치: `long-sequence-analysis` (commit `701680f` 기준).
+활성 브랜치: **`fault-enumeration-analysis`** (§17 — 실장님 새 방향 deterministic fault enumeration 분석 완료).
+이전 작업 보존 브랜치: `decoder-add-analysis` (§14, §15, §16 분류기 인프라 + 14/18 학습 셀).
+재사용 데이터 소스: `origin/fault-enumeration-table` (774-record table).
 
 ```
-main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis)
-                                          │
-                                          └─ … ─ 25e409b ─ NEW  (decoder-add-analysis)
-                                                  ↑      ↑
-                                                  §14   §16 classifier 인프라
-                                                  §15    + R1/R3b 데이터셋 + preview
+main ── … ─ 701680f  (long-sequence-analysis)
+              │
+              └─ … ─ 16e12df  (decoder-add-analysis)  §14 §15 §16
+                       │
+                       └─ 4d6f945 ─ 98f3b6b  (fault-enumeration-analysis, 현재 활성)
+                                              §17  ← 야간 진행 결과
 ```
 
 | 단계 | 상태 | 무엇이 됐나 |
@@ -35,10 +36,10 @@ main ── 5692656 ─ 5074b1c ─ 891eca3 ─ 701680f  (long-sequence-analysis
 | Task #3 R1 ceiling (Phase 2) | ✅ | 4 구조적 ambiguity 그룹 발견 (§13) |
 | Task #7 R3b 디코더 (Phase 6) | ✅ | §13.7 가설: directional TRUE / quantitative FALSE (§14) |
 | Task #7b sequence-level 분리 | ✅ | R3b 분포가 모든 (k,k′) pair에서 distinguishable, Cohen's d ∝ √t scaling, T_required(d=2) ≈ 400–2200 (§15) |
-| **Task #6 분류기 인프라 (Phase 5a)** | ✅ | **RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R2+R3b 데이터셋 (72K seq 각, T_max=1000) (§16)** |
-| **R2 phenom decoder 데이터셋 + §15 분리 확인** | ✅ | `PhenomDecoder` + R2 데이터 생성 + 8쌍 모두 d∝√t 확인, worst T_req ≈ 682 (§15.7) |
-| 분류기 학습 (Phase 5b) | ⏸ pending — 첫 cell GRU on R3b, T=300 | |
-| Task #5 본 데이터셋 (Phase 4) | classifier dataset이 사실상 대체 | |
+| Task #6 분류기 인프라 (Phase 5a) | ✅ | RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R2+R3b 데이터셋 (72K seq 각, T_max=1000) (§16) |
+| R2 phenom decoder 데이터셋 + §15 분리 확인 | ✅ | `PhenomDecoder` + R2 데이터 생성 + 8쌍 모두 d∝√t 확인, worst T_req ≈ 682 (§15.7) |
+| 분류기 학습 14/18 셀 | ⏸ | R2/GRU/T=512=95.3% (R1 한계 돌파), R1/GRU/T=512=73.4% (한계 근접). r3b의 4셀 남음. |
+| **Task #8 §17 fault-enumeration 패턴 분석 (실장님 새 방향)** | ✅ | **NIGHT_LOG_2026_05_26.md 참조 — 774-record deterministic enumeration, R1 multiset 1.000 → 0.333 saturate, frame propagation one-shot** |
 
 이전에 있던 Task #4 (72-pair sequence 운명)는 Task #3에 흡수돼서 별도 진행
 불필요. Task #2 (파라미터 픽)는 §15 결과 + classifier 작업으로 sweet spot
@@ -123,14 +124,38 @@ R2 시나리오에서도 동일 분석 반복 수행 (N=2000, T=200, seed=0):
 
 **결론: R2도 R3b와 동일하게 모든 8 ambiguity-group pair에서 d∝√t 확인, 충분한 T에서 완전 분리 가능. R2의 worst-case T_required(≈682)가 R3b(≈2174)보다 오히려 낮음** — PhenomDecoder의 "틀린" correction이 서로 다른 방식으로 틀려서 CNOT별 residual pattern을 더 잘 구별시킴.
 
+## 3.8 핵심 발견 5 — Task #8: §17 deterministic fault-enumeration 패턴 (실장님 새 방향)
+
+자세한 내용은 [README.md §17](README.md#17-fault-enumeration-pattern-analysis-branch-fault-enumeration-analysis), 야간 진행 narrative는 [NIGHT_LOG_2026_05_26.md](NIGHT_LOG_2026_05_26.md).
+
+§13–§16은 모두 stochastic — R1은 Pauli marginalize, R3b/R2는 MC. §17은 그 *deterministic 짝꿍*. `origin/fault-enumeration-table`의 774-record 단일-fault enumeration (387 case × 2 mode)을 분석.
+
+| 측정 | 결과 |
+|---|---|
+| Round-0 detection-event multiset overlap, R1 4그룹 | **1.000 정확히 일치** (§13의 R1 claim 비트 단위 deterministic 검증) |
+| 같은 측정, 3-round 24-bit | **0.200–0.467로 급락** (frame propagation으로 그룹 깨짐) |
+| n_rounds = 5 까지 확장한 같은 측정 | **T=2에서 0.333으로 saturate, T=3,4,5 변화 0** |
+
+→ **단일 round-0 fault의 deterministic frame propagation은 ONE 라운드 만에 모든 discriminative 정보를 드러내고 saturate. §15의 d∝√t는 *새 fault arrival rate*에서 오는 것이지 *단일 fault의 누적*에서 오는 것이 아님.**
+
+분류기 설계 함의: window ≥ 2의 모든 architecture는 per-fault deterministic 정보 전부에 접근. 학습 시 inductive bias는 "fault count + per-round signature averaging" 쪽이 맞고, 긴 시퀀스 통째 recurrent state 누적은 본질적이지 않을 가능성.
+
+### 보조 발견
+- Cat C 360개 → 24-bit raw로 127 unique (compression 0.353), 16개 silent class
+- 16개 mode-invariant fault = 16개 silent fault (정확히 set 일치, §17.9 Q2)
+- "8 unique vs 15 unique" CNOT 분할은 R1 group과 partial overlap만 (§17.9 Q1, conjecture 틀림)
+- Cat A noreset mode: round 1이 정확히 zero — deterministic 입력에서 no-reset mode의 "differential" 성격이 깨끗하게 드러남
+
 ## 4. 다음 step 추천 순서
 
-§16 인프라 + R1/R2/R3b 데이터 모두 완료, R2 §15 separability 확인 완료. 다음:
+§16 인프라 + R1/R2/R3b 데이터 모두 완료, §17 deterministic enumeration도 완료. 다음:
 
-1. **첫 classifier cell** ★ (지금) — GRU on R3b, T = 300: §14의 marginal-Bayes 0.10 plateau을 깨는지 확인. 학습 ~5분. `correst_env/bin/python scripts/train_seq_classifier.py --model gru --scenario r3b --T 300 --device auto`
-2. **3-scenario × 3-model × 3-T sweep** — 27 cells (R1/R2/R3b × RNN/GRU/Transformer × T ∈ {100, 300, 1000}). `correst_env/bin/python scripts/sweep_classifiers.py` 총 학습 시간 ~3-9시간 (모델·T에 따라). MPS 가속.
-3. **(선택) 더 큰 T (예: T=2000) 1-cell** — §15의 R2 worst-pair T_required ≈ 682, R3b ≈ 2170 인근에서 실측 vs projection 비교.
-4. **(선택) §14.7 의 후속 R3b decoder 변형** — posterior decoder, multi-window.
+1. **남은 4개 classifier sweep cell** ★ — r3b/rnn/T512, r3b/gru/T512, r3b/transformer/T128/T512. `correst_env/bin/python scripts/sweep_classifiers.py` 또는 개별 셀.
+2. **§16 결과 §17 관점으로 재해석** — R2/GRU/T=512 = 95.3% 결과를 §17.10의 "fault count + per-round signature averaging" 관점에서 해석. 트랜스포머가 R2에서 실패한 것 (4.5%)도 같은 lens로 설명 가능한지.
+3. **(실장님 새 방향 후속) constant-step distance-d 데이터셋** — surface_code_layout / stabilizer_circuit / fault_schedule을 d ≥ 5로 일반화.
+4. **(웹 정리)** — d 설정 → surface code 그림 + 데이터셋 생성 모드 + 학습 모델 inference 모드 3-mode 웹앱.
+5. **(AlphaQubit 비교)** — 논문 읽고 dataset/output 형식 우리 것과 비교.
+6. **(선택) §14.7 후속 R3b decoder 변형** — posterior-aware decoder.
 
 ## 5. 핵심 파일 맵
 
