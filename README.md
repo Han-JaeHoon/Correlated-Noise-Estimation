@@ -794,7 +794,7 @@ Results, plots, and discussion will be appended as the experiments complete.
 
 ## 17. Fault-enumeration pattern analysis (branch `fault-enumeration-analysis`)
 
-### 17.1 Motivation — 실장님's new direction
+### 17.1 Motivation — new research direction
 
 After the R3b/R2 sequence-level results (§15, §15.7), a follow-up question
 was raised: **"What patterns do d-round syndrome measurements show as a

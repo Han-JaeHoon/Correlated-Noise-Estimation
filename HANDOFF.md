@@ -16,7 +16,7 @@ sequence-level로 reframe한 **R1 시나리오**.
 
 ## 2. 현재 위치 (2026-05-26 갱신, 4회차 — 야간 진행)
 
-활성 브랜치: **`fault-enumeration-analysis`** (§17 — 실장님 새 방향 deterministic fault enumeration 분석 완료).
+활성 브랜치: **`fault-enumeration-analysis`** (§17 — 새 연구 방향: deterministic fault enumeration 분석 완료).
 이전 작업 보존 브랜치: `decoder-add-analysis` (§14, §15, §16 분류기 인프라 + 14/18 학습 셀).
 재사용 데이터 소스: `origin/fault-enumeration-table` (774-record table).
 
@@ -39,7 +39,7 @@ main ── … ─ 701680f  (long-sequence-analysis)
 | Task #6 분류기 인프라 (Phase 5a) | ✅ | RNN/GRU/Transformer 모델, train/sweep/analyze 스크립트, R1+R2+R3b 데이터셋 (72K seq 각, T_max=1000) (§16) |
 | R2 phenom decoder 데이터셋 + §15 분리 확인 | ✅ | `PhenomDecoder` + R2 데이터 생성 + 8쌍 모두 d∝√t 확인, worst T_req ≈ 682 (§15.7) |
 | 분류기 학습 14/18 셀 | ⏸ | R2/GRU/T=512=95.3% (R1 한계 돌파), R1/GRU/T=512=73.4% (한계 근접). r3b의 4셀 남음. |
-| **Task #8 §17 fault-enumeration 패턴 분석 (실장님 새 방향)** | ✅ | **NIGHT_LOG_2026_05_26.md 참조 — 774-record deterministic enumeration, R1 multiset 1.000 → 0.333 saturate, frame propagation one-shot** |
+| **Task #8 §17 fault-enumeration 패턴 분석 (새 연구 방향)** | ✅ | **NIGHT_LOG_2026_05_26.md 참조 — 774-record deterministic enumeration, R1 multiset 1.000 → 0.333 saturate, frame propagation one-shot** |
 
 이전에 있던 Task #4 (72-pair sequence 운명)는 Task #3에 흡수돼서 별도 진행
 불필요. Task #2 (파라미터 픽)는 §15 결과 + classifier 작업으로 sweet spot
@@ -124,7 +124,7 @@ R2 시나리오에서도 동일 분석 반복 수행 (N=2000, T=200, seed=0):
 
 **결론: R2도 R3b와 동일하게 모든 8 ambiguity-group pair에서 d∝√t 확인, 충분한 T에서 완전 분리 가능. R2의 worst-case T_required(≈682)가 R3b(≈2174)보다 오히려 낮음** — PhenomDecoder의 "틀린" correction이 서로 다른 방식으로 틀려서 CNOT별 residual pattern을 더 잘 구별시킴.
 
-## 3.8 핵심 발견 5 — Task #8: §17 deterministic fault-enumeration 패턴 (실장님 새 방향)
+## 3.8 핵심 발견 5 — Task #8: §17 deterministic fault-enumeration 패턴 (새 연구 방향)
 
 자세한 내용은 [README.md §17](README.md#17-fault-enumeration-pattern-analysis-branch-fault-enumeration-analysis), 야간 진행 narrative는 [NIGHT_LOG_2026_05_26.md](NIGHT_LOG_2026_05_26.md).
 
@@ -152,7 +152,7 @@ R2 시나리오에서도 동일 분석 반복 수행 (N=2000, T=200, seed=0):
 
 1. **남은 4개 classifier sweep cell** ★ — r3b/rnn/T512, r3b/gru/T512, r3b/transformer/T128/T512. `correst_env/bin/python scripts/sweep_classifiers.py` 또는 개별 셀.
 2. **§16 결과 §17 관점으로 재해석** — R2/GRU/T=512 = 95.3% 결과를 §17.10의 "fault count + per-round signature averaging" 관점에서 해석. 트랜스포머가 R2에서 실패한 것 (4.5%)도 같은 lens로 설명 가능한지.
-3. **(실장님 새 방향 후속) constant-step distance-d 데이터셋** — surface_code_layout / stabilizer_circuit / fault_schedule을 d ≥ 5로 일반화.
+3. **(새 연구 방향 후속) constant-step distance-d 데이터셋** — surface_code_layout / stabilizer_circuit / fault_schedule을 d ≥ 5로 일반화.
 4. **(웹 정리)** — d 설정 → surface code 그림 + 데이터셋 생성 모드 + 학습 모델 inference 모드 3-mode 웹앱.
 5. **(AlphaQubit 비교)** — 논문 읽고 dataset/output 형식 우리 것과 비교.
 6. **(선택) §14.7 후속 R3b decoder 변형** — posterior-aware decoder.
