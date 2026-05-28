@@ -1,0 +1,31 @@
+Spatial mixture ambiguity
+  backend=mc  mode=reset  d=3
+  p_high=0.05  p_bg=0.005
+  dominant locations: 24
+  TV threshold: 7.02e-02  (bootstrap (max=0.0468, mean=0.0459) -> 1.5*max)
+  ambiguity groups: 23
+
+Groups (size, members):
+  AMBIG [ 2] cnot22, cnot23
+  ok    [ 1] cnot00
+  ok    [ 1] cnot01
+  ok    [ 1] cnot02
+  ok    [ 1] cnot03
+  ok    [ 1] cnot04
+  ok    [ 1] cnot05
+  ok    [ 1] cnot06
+  ok    [ 1] cnot07
+  ok    [ 1] cnot08
+  ok    [ 1] cnot09
+  ok    [ 1] cnot10
+  ok    [ 1] cnot11
+  ok    [ 1] cnot12
+  ok    [ 1] cnot13
+  ok    [ 1] cnot14
+  ok    [ 1] cnot15
+  ok    [ 1] cnot16
+  ok    [ 1] cnot17
+  ok    [ 1] cnot18
+  ok    [ 1] cnot19
+  ok    [ 1] cnot20
+  ok    [ 1] cnot21

@@ -1,0 +1,12 @@
+{
+  "mode": "reset",
+  "d": 3,
+  "p_high": 0.01,
+  "p_bg": 0.0,
+  "backend": "auto",
+  "n_shots": 200000,
+  "include_data_as_dominant": false,
+  "threshold": null,
+  "seed": 0,
+  "tag": "exact_phigh0.01"
+}
