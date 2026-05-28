@@ -36,6 +36,7 @@ Outputs (under data/analysis/spatial_mixture/<tag>/):
 
 import argparse
 import json
+import sys
 from collections import Counter
 from itertools import combinations, product
 from pathlib import Path
@@ -45,43 +46,11 @@ import matplotlib.pyplot as plt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ATOM_NPZ = PROJECT_ROOT / "data" / "analysis" / "fault_enumeration" / "fault_enumeration_table.npz"
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.spatial_mixture import load_atoms, precompute_shifted_atoms, sample_shots  # noqa: E402
+
 OUT_ROOT = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture"
-
-
-# ---------------------------------------------------------------------------
-# atom loading + time-translation
-# ---------------------------------------------------------------------------
-
-def load_atoms(mode):
-    z = np.load(ATOM_NPZ, allow_pickle=True)
-    sel = z["mode"] == mode
-    err = z["error"][sel]
-    syn = z["syndrome"][sel].astype(np.int8)
-    d_atomic = syn.shape[1]
-
-    by_loc = {}
-    for e, s in zip(err, syn):
-        _, loc, pauli = e.split(":")
-        by_loc.setdefault(loc, []).append((pauli, s))
-    atoms = {loc: (np.stack([s for _, s in items]),
-                    [p for p, _ in items])
-             for loc, items in by_loc.items()}
-    return atoms, d_atomic
-
-
-def precompute_shifted_atoms(atoms, d):
-    """shifted[loc] : (d, n_paulis, d, 8) int8 -- fault-round x pauli x rounds x stab"""
-    shifted = {}
-    for loc, (arr, _) in atoms.items():
-        n_paulis, d_atomic, n_stab = arr.shape
-        out = np.zeros((d, n_paulis, d, n_stab), dtype=np.int8)
-        for r in range(d):
-            end = min(d_atomic, d - r)
-            if end > 0:
-                out[r, :, r:r + end, :] = arr[:, :end, :]
-        shifted[loc] = out
-    return shifted
 
 
 def pack_syndrome(syn):
@@ -125,26 +94,6 @@ def tv_exact(p, q):
 # ---------------------------------------------------------------------------
 # MC backend (p_bg > 0 or sanity check)
 # ---------------------------------------------------------------------------
-
-def sample_shots(shifted, all_loc_keys, dominant, p_high, p_bg, d, n_shots, rng):
-    n_stab = next(iter(shifted.values())).shape[-1]
-    shots = np.zeros((n_shots, d, n_stab), dtype=np.int8)
-    for loc in all_loc_keys:
-        sh_arr = shifted[loc]
-        n_paulis = sh_arr.shape[1]
-        rate = p_high if loc == dominant else p_bg
-        if rate <= 0.0:
-            continue
-        event_mask = rng.random((n_shots, d)) < rate
-        n_events = int(event_mask.sum())
-        if n_events == 0:
-            continue
-        shot_idx, round_idx = np.where(event_mask)
-        pauli_idx = rng.integers(0, n_paulis, size=n_events)
-        atoms_to_add = sh_arr[round_idx, pauli_idx]
-        np.bitwise_xor.at(shots, shot_idx, atoms_to_add)
-    return shots
-
 
 def empirical_counter(shots):
     flat = shots.reshape(shots.shape[0], -1).astype(np.uint8)
