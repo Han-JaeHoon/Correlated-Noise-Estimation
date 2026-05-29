@@ -1,0 +1,18 @@
+{
+  "out_root": "/home/user/Correlated-Noise-Estimation/data/analysis/7_r3b_ceiling",
+  "p_bg": [
+    0.01
+  ],
+  "p_high": [
+    0.1
+  ],
+  "T": [
+    10,
+    30,
+    50
+  ],
+  "n_train": 80,
+  "n_test": 50,
+  "seed": 0,
+  "n_test_r1": 2000
+}
