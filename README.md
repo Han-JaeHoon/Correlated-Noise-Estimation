@@ -1,8 +1,16 @@
-# Correlated-Noise-Estimation
+# Correlated-Noise-Estimation — Spatial Analysis Branch
 
 A research codebase for analyzing whether the **location of a faulty CNOT gate** acting as a dominant noise source in a `d=3` rotated surface code can be **identified from syndrome measurement sequences alone**, and for designing a learning model on top of those findings.
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
+
+> This branch (`spatial-data-analysis`) holds the **statistical-bag** line of work: many short d-round shots, the deterministic 387-atom enumeration interpreted as a mixture distribution, set-classifier learning.
+>
+> For the **time-cumulative** line (long-sequence syndrome streams, R1/R2/R3b decoders, RNN/GRU/Transformer classifier), see branch `sequential-data-analysis`.
+>
+> For the **baseline problem statement** (single-round 216-case sweep, 72 cross-Pauli collisions), see branch `main`.
+
+§§1 – 11 below describe the original baseline analysis (inherited from `main`). §12 (Spatial mixture ambiguity) and §13 (ML dataset) are this branch's contributions.
 
 ---
 
@@ -62,12 +70,16 @@ At toy `d=3` a lookup table works, but the table cost explodes with code distanc
     ├── mid_measure_no_reset/           # forward-sim data (mode 2)
     ├── no_mid_measure_final_sample/    # forward-sim data (mode 3)
     ├── no_mid_measure_final_probs/     # forward-sim data (mode 4)
-    └── analysis/                       # analysis results (output of this study)
-        ├── 1_per_pauli_degeneracy/
-        ├── 2_pauli_sweep_summary/
-        ├── 3_cross_pauli_conflict/
-        ├── 4_cross_pauli_per_pauli_view/
-        └── 5_cross_pauli_pair_collisions/
+    ├── analysis/
+    │   ├── 1_per_pauli_degeneracy/         # §6.1 — baseline single-Pauli
+    │   ├── 2_pauli_sweep_summary/          # §6.2
+    │   ├── 3_cross_pauli_conflict/         # §6.3
+    │   ├── 4_cross_pauli_per_pauli_view/   # §6.4
+    │   ├── 5_cross_pauli_pair_collisions/  # §6.5 — 72 pairs
+    │   ├── fault_enumeration/              # foundation: 387 atoms
+    │   └── spatial_mixture/                # §12 — pairwise TV per regime
+    └── ml_dataset/                         # §13 — per-shot training pools
+        └── noreset_d3_phigh0.1_pbg0.01_n1000/
 ```
 
 ---
@@ -317,3 +329,126 @@ Every conclusion in this study depends on the following assumptions:
 5. **No measurement / reset noise**: ancilla measurement and reset are themselves perfect.
 
 If any of these are relaxed, the analysis results (especially the 72-pair collision count) must be re-evaluated.
+
+---
+
+## 12. Spatial mixture ambiguity (this branch)
+
+A different way of asking "can a faulty CNOT be identified?". Instead of one **long** syndrome stream (the sequential branch's approach), draw many **short** independent d-round shots; each shot fires the dominant fault at most a few times under a low-rate Bernoulli model, with random Pauli draws. The 387 deterministic atoms (§ "fault_enumeration foundation") become the **components of a mixture distribution** `P_k(s)` over d-round syndromes for each candidate dominant location k.
+
+### 12.1 Model
+
+For one shot of d rounds, location k dominant:
+
+```
+For each round r ∈ {0..d-1}:
+    a fault fires at k with probability p_high
+    if fired, a Pauli is drawn uniformly from k's atomic pool
+        (15 for CNOT, 3 for data idle)
+
+For each background location ℓ ≠ k and each round r:
+    a fault fires with probability p_bg, uniform Pauli
+
+shot syndrome = XOR of round-shifted atomic syndromes from all fired events
+```
+
+Implemented in [`src/spatial_mixture.py`](src/spatial_mixture.py) (`load_atoms`, `precompute_shifted_atoms`, `sample_shots`).
+
+### 12.2 Two backends
+
+| Backend | When used | What it computes |
+|---|---|---|
+| **exact** | `p_bg = 0` | Enumerates all 4 096 = 1 + 3·15 + 3·15² + 15³ (round-subset × Pauli-tuple) combinations at the dominant location. Each combination has an analytical probability, accumulated into a Counter. Distinct syndromes per location: 32 – 1024. Probability sum verified = 1.000000. **No Monte-Carlo noise.** |
+| **mc** | `p_bg > 0` | Samples N_shots from the full bag-of-shots model. Bootstrap split-half noise floor for grouping threshold. |
+
+Script: [`scripts/analyze_spatial_mixture_ambiguity.py`](scripts/analyze_spatial_mixture_ambiguity.py). Outputs land in [`data/analysis/spatial_mixture/<tag>/`](data/analysis/spatial_mixture/).
+
+### 12.3 Headline finding — 24 / 24 distinguishable
+
+**All 24 CNOTs produce mathematically distinct mixture distributions** under every regime tested. Pairwise total-variation distances:
+
+| Regime (`mode, d, p_high, p_bg`) | min TV | max TV | median | # ambiguity groups |
+|---|---|---|---|---|
+| `reset, 3, 0.1, 0.0` (exact) | **0.104** | 0.271 | 0.243 | **24** |
+| `reset, 3, 0.05, 0.0` (exact) | 0.053 | 0.143 | 0.127 | **24** |
+| `reset, 3, 0.01, 0.0` (exact) | 0.011 | 0.030 | 0.026 | **24** |
+| `reset, 3, 0.001, 0.0` (exact) | 0.0011 | 0.0030 | 0.0027 | **24** |
+| `reset, 3, 0.05, 0.005` (MC, N=500k) | 0.070 | 0.135 | 0.124 | **24** |
+
+Two structural observations:
+
+- **`max TV ≈ 1 − (1 − p_high)^d`** = the non-vacuum probability mass — the natural ceiling because two locations with disjoint non-vacuum supports differ only on that mass.
+- **`min TV` occurs exactly at the long-sequence R1 ambiguity-group pairs**: `{6, 7}`, `{22, 23}` (smallest, TV ≈ 0.104 at p_high = 0.1), then `{14, 15, 17}`, `{18, 19, 20}` (TV ≈ 0.153). The bag-of-shots scenario **breaks** the long-sequence structural ambiguity, but the hardest pairs are exactly the same.
+
+### 12.4 What "distinguishable" means here
+
+`TV(P_a, P_b) > 0` ⇔ the two distributions are **literally different** ⇒ the optimal Bayes test attains arbitrary accuracy given enough samples (Neyman–Pearson). One sample gives error rate `½(1 − TV)`; N samples give `≤ exp(−N · TV² / 2)`.
+
+Concretely, at `p_high = 0.1`:
+
+| TV value | Example pair | 1-shot error | N for 95 % binary |
+|---|---|---|---|
+| 0.104 (min) | cnot06 ↔ cnot07 | 44.8 % | ≈ 540 |
+| 0.243 (median) | typical | 37.9 % | ≈ 100 |
+| 0.271 (max) | cnot02 ↔ cnot11 | 36.5 % | ≈ 80 |
+
+So "distinguishable" is an **information-theoretic** statement: no two location-conditional distributions are identical. Practical sample efficiency is a separate question that depends on `min TV` and the classifier.
+
+---
+
+## 13. ML training dataset (this branch)
+
+Per-shot dataset for 24-class CNOT identification, intended to be **bagged at training time** (sample N shots per bag, label = which CNOT). Built by [`scripts/build_ml_dataset.py`](scripts/build_ml_dataset.py) from the §12 sampler.
+
+### 13.1 First regime
+
+| Setting | Value |
+|---|---|
+| mode | `noreset` |
+| d (rounds per shot) | 3 |
+| p_high | 0.1 |
+| p_bg | 0.01 |
+| N_per_class | 1 000 |
+| Total shots | 24 000 |
+| Split (per class) | train 800 / val 100 / test 100 |
+
+Location: [`data/ml_dataset/noreset_d3_phigh0.1_pbg0.01_n1000/`](data/ml_dataset/noreset_d3_phigh0.1_pbg0.01_n1000/).
+
+### 13.2 Files
+
+| File | Shape / type | Contents |
+|---|---|---|
+| `shots.npy` | `(24 000, 3, 8) int8` | raw syndrome bits |
+| `labels.npy` | `(24 000,) int8` | CNOT index 0..23 |
+| `split.npz` | `train_idx, val_idx, test_idx` | stratified |
+| `cnot_keys.json` | 24 strings | label → CNOT name |
+| `config.json` | dict | generation parameters + atom source |
+| `sanity.json` | dict | per-class vacuum frac, mean bits, totals |
+
+### 13.3 Sanity (recorded in `sanity.json`)
+
+- Class balance: 1 000 ± 0 shots / class.
+- Vacuum fraction (all-zero syndrome): **0.32** vs analytical lower bound `(1 − p_high)^d · (1 − p_bg)^(32 d) = 0.28`. The 0.04 gap is XOR-cancellation among multi-fault events.
+- Per-class vacuum frac across CNOTs: 0.295 – 0.348 (≈ 3σ MC range at N = 1 000).
+- Mean event bits per shot: 2.1 – 2.7.
+
+### 13.4 Theoretical N guidance for a single bag
+
+From §12.4, the hardest pair at this regime has `TV ≈ 0.104`. Approximate `N* ≈ 8 ln(20) / TV² ≈ 720` shots/bag for ~95 % accuracy on the worst pair; `N* ≈ 100` already gives a useful signal on the median pair. Sweep `N ∈ {10, 30, 100, 300}` first; regenerate with larger `N_per_class` (e.g. 5 000) before going past `N = 300` per bag.
+
+### 13.5 Regeneration
+
+```bash
+python scripts/build_ml_dataset.py \
+    --mode noreset --d 3 --p-high 0.1 --p-bg 0.01 \
+    --n-per-class 1000 --seed 42
+```
+
+Reproducible — `seed` is recorded in `config.json` and feeds both the per-class sampling and the stratified split.
+
+### 13.6 Status & next
+
+- ✅ Per-shot pool ready for one regime.
+- ⏳ Bag DataLoader (PyTorch `Dataset` with on-the-fly N-shot sampling per label).
+- ⏳ Deep Sets / Set Transformer baseline, then accuracy-vs-N curve to compare against §12.4 theoretical N*.
+- ⏳ Additional regimes when needed: `p_high ∈ {0.01, 0.05}`, `reset` mode counterpart, `d = 5`.

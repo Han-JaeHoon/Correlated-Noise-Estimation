@@ -1,6 +1,14 @@
-# Correlated-Noise-Estimation
+# Correlated-Noise-Estimation — Spatial Analysis Branch
 
 `d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
+
+> 이 브랜치(`spatial-data-analysis`)는 **통계 누적** 라인의 작업을 담고 있습니다: 다수의 짧은 d-라운드 shot, 387 결정론적 atom을 mixture distribution으로 해석, set classifier 학습.
+>
+> **시간 누적** 라인(긴 syndrome stream, R1/R2/R3b decoder, RNN/GRU/Transformer 분류기)은 `sequential-data-analysis` 브랜치에 있습니다.
+>
+> **기본 문제 정의**(단일-라운드 216-케이스 sweep, 72개 cross-Pauli 충돌)는 `main` 브랜치를 참고하세요.
+>
+> §§1–11은 main에서 상속된 baseline 분석입니다. §12 (Spatial mixture ambiguity) 및 §13 (ML dataset)이 이 브랜치 고유 기여 — 자세한 내용은 영어 README.md를 참고해주세요.
 
 ---
 
