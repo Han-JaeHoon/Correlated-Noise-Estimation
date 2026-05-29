@@ -1,8 +1,16 @@
-# Correlated-Noise-Estimation
+# Correlated-Noise-Estimation — Sequential Analysis Branch
 
 `d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
 
-> **다른 컴퓨터/Claude 세션에서 이어받으시나요?** [`HANDOFF.md`](HANDOFF.md) 부터 읽어주세요 — 현재 브랜치·최신 결과·다음 추천 step을 30초에 파악하는 entry point입니다.
+> 이 브랜치(`sequential-data-analysis`)는 **시간 누적** 라인의 작업을 담고 있습니다: 긴 syndrome 스트림, R1/R2/R3b 시나리오, 디코더 패밀리, §16 분류기 sweep.
+>
+> **통계 누적** 라인(다수의 짧은 d-round shot, mixture-distribution 분석, set classifier)은 `spatial-data-analysis` 브랜치에 있습니다.
+>
+> **기본 문제 정의**(단일-라운드 216-케이스 sweep, 72개 cross-Pauli 충돌)는 `main` 브랜치를 참고하세요.
+>
+> 진행 일지(HANDOFF, NIGHT_LOG, TRAINING_README)는 [`docs/archive/`](docs/archive/)로 이동되었습니다.
+>
+> §17 (fault-enumeration 패턴 분석) 및 §18 (시퀀스-레벨 동치류)의 자세한 한국어 번역은 아직 미완 — 영어 README.md를 참고해주세요.
 
 ---
 
@@ -683,7 +691,9 @@ Plot: [d_scaling_T200_N2000_main.png](data/analysis/8_seq_separability/d_scaling
 
 ---
 
-## 16. Task #6 — Sequence classifier (진행 중)
+## 16. Task #6 — Sequence classifier (완료: 18/18 cells)
+
+> **최종 결과**: R2/GRU/T512 = **95.3%**, R3b/GRU/T512 = **91.2%** — 두 디코더 모두 **R1 천장(75%)을 돌파**. R3b/Transformer/T512 = 47.5%. RNN은 모든 시나리오에서 실패(gradient vanishing). 이로써 §15의 이론적 분리 가능성이 실제 학습 정확도로 도달 가능함이 입증되고, §14의 plateau(0.10)는 marginal-Bayes / lex-min 디코더의 한계였을 뿐 정보이론적 천장이 아니었음 확정.
 
 §15에서 R3b sequence 분포가 모든 (k, k′) pair에 대해 충분히 긴 T에서 distinguishable임을 확인. 헤드라인 미해결 질문은 **학습된 classifier가 실제로 per-class accuracy → 1을 달성하는가**. Task #6은 그 classifier를 만들고 세 reference에 대해 benchmark:
 

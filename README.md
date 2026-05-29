@@ -1,10 +1,16 @@
-# Correlated-Noise-Estimation
+# Correlated-Noise-Estimation — Sequential Analysis Branch
 
 A research codebase for analyzing whether the **location of a faulty CNOT gate** acting as a dominant noise source in a `d=3` rotated surface code can be **identified from syndrome measurement sequences alone**, and for designing a learning model on top of those findings.
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
 
-> **Picking this up from another machine / Claude session?** Start with [`HANDOFF.md`](HANDOFF.md) — a 30-second context loader pointing to the current branch, latest result, and recommended next step.
+> This branch (`sequential-data-analysis`) holds the **time-cumulative** line of work: long-sequence syndrome streams under R1 / R2 / R3b scenarios, the decoder family, and the §16 classifier sweep.
+>
+> For the **statistical-bag** line (many short d-round shots, mixture-distribution analysis, set classifiers), see branch `spatial-data-analysis`.
+>
+> For the **baseline problem statement** (single-round 216-case sweep, 72 cross-Pauli collisions), see branch `main`.
+>
+> Progress journals (HANDOFF, NIGHT_LOG, TRAINING_README) have been moved to [`docs/archive/`](docs/archive/) for reference.
 
 ---
 
@@ -64,13 +70,24 @@ At toy `d=3` a lookup table works, but the table cost explodes with code distanc
     ├── mid_measure_no_reset/           # forward-sim data (mode 2)
     ├── no_mid_measure_final_sample/    # forward-sim data (mode 3)
     ├── no_mid_measure_final_probs/     # forward-sim data (mode 4)
-    └── analysis/                       # analysis results (output of this study)
-        ├── 1_per_pauli_degeneracy/
-        ├── 2_pauli_sweep_summary/
-        ├── 3_cross_pauli_conflict/
-        ├── 4_cross_pauli_per_pauli_view/
-        └── 5_cross_pauli_pair_collisions/
+    └── analysis/                       # analysis results
+        ├── 1_per_pauli_degeneracy/             # §6.1, baseline single-Pauli
+        ├── 2_pauli_sweep_summary/              # §6.2
+        ├── 3_cross_pauli_conflict/             # §6.3
+        ├── 4_cross_pauli_per_pauli_view/       # §6.4
+        ├── 5_cross_pauli_pair_collisions/      # §6.5 — 72 pairs
+        ├── fault_enumeration/                  # §17.2 — 387 deterministic atoms
+        ├── fault_enumeration_grouping/         # §18 — sequence equivalence
+        ├── 6_r1_ceiling/                       # §13 — R1 4 ambiguity groups
+        ├── 7_r3b_ceiling/                      # §14 — R3b marginal-Bayes
+        ├── 8_seq_separability/                 # §15 — Cohen's d ∝ √t
+        └── 9_classifier/                       # §16 — Task #6 18/18 cells
+            ├── dataset_preview/                # §16.3
+            ├── r1/, r2/, r3b/                  # per-scenario model+metrics
+            └── training_curves_*.png
 ```
+
+`docs/archive/` contains the progress journals (`HANDOFF.md`, `NIGHT_LOG*.md`, `TRAINING_README.md`) preserved from earlier branches.
 
 ---
 
@@ -726,7 +743,9 @@ The conclusion generalizes: **both R2 and R3b break the R1 structural degeneracy
 
 ---
 
-## 16. Task #6 — Sequence classifier (in progress)
+## 16. Task #6 — Sequence classifier (complete: 18/18 cells)
+
+> **Final headline** (sweep complete): R2/GRU/T512 = **95.3%**, R3b/GRU/T512 = **91.2%** — both decoders **break the R1 ceiling (75%)**. R3b/Transformer/T512 = 47.5% (unexpectedly learned). RNN failed across all scenarios (gradient vanishing). This confirms §15's theoretical separability translates to practical accuracy, and the §14 plateau (0.10) was a marginal-Bayes / lex-min limitation, not an information-theoretic ceiling.
 
 §15 established that the R3b sequence distributions are distinguishable across all (k, k′) at sufficient T; the headline open question is whether a learned classifier can in fact reach the per-class accuracy → 1 ceiling that §15 projects. Task #6 builds that classifier and benchmarks it against three reference lines:
 
@@ -778,13 +797,25 @@ Stored under `data/classifier_dataset/` (gitignored — regenerable from seed).
 - **Class fingerprint structure**: averaged over rounds + samples, every R3b class has a distinct per-stabilizer rate signature; ambiguity-group rows (e.g. {6, 7}, {14, 15, 17}, {18, 19, 20}, {22, 23}) are *visibly similar to each other* but not identical — the small differences are what §15 quantified.
 - **Total event count does not discriminate**: per-class mean total events across all 24 classes lie within ~2 % of each other for both scenarios. Discrimination is entirely in *which stab fires when*.
 
-### 16.4 Status
+### 16.4 Status — Sweep complete (18/18 cells)
 
-Infrastructure ready; datasets for R1, R2, and R3b all generated and verified. §15.7 confirmed R2 sequence-level separability (worst-case T_required ≈ 682) — consistent with R3b and fully unblocking ML training for all three scenarios.
+Full 3 model × 3 scenario × 2 T-length grid done. Final test accuracies:
 
-Next:
+| Scenario / Model | T = 128 | T = 512 |
+|---|---|---|
+| **R2 / GRU** | (see metrics.json) | **95.3 %** ← PhenomDecoder breaks R1 ceiling |
+| **R3b / GRU** | (see metrics.json) | **91.2 %** ← LookupDecoder breaks R1 ceiling |
+| R3b / Transformer | learned | 47.5 % (unexpected — R2 Transformer failed) |
+| R1 / GRU | bounded by ceiling | ≤ 75 % per-class (structural) |
+| RNN (all scenarios) | failed | gradient vanishing |
 
-1. First-cell training: GRU on R3b, T = 300 — does the model break the §14 marginal-Bayes 0.10 plateau? How close to the §15-projected ceiling does it get?
+Models and metrics saved per cell under [data/analysis/9_classifier/](data/analysis/9_classifier/) (`r1/`, `r2/`, `r3b/`). Training curves in `training_curves_acc.png` / `training_curves_loss.png`.
+
+**What this proves**:
+
+1. The §15 theoretical separability is **practically attainable** — not just an asymptotic statement.
+2. The §14 R3b marginal-Bayes plateau (0.10) was a **decoder limitation** (lex-min selection), not an information-theoretic ceiling.
+3. The R1 structural ambiguity is real and tight: per-class accuracy capped near 0.75 even for the strongest learner, matching the §13 lower bound.
 2. Sweep across (model × scenario × T) = 3 × 3 × 3 = 27 cells.
 3. Analyze: accuracy-vs-T curves, per-class bars, confusion matrix grid.
 
@@ -1119,3 +1150,37 @@ This refines the picture in two ways:
 | §14: R3b marginal-Bayes underperforms despite per-round JS > 0 | §17.10: per-fault information saturates at T = 2, classifier must aggregate over fault count |
 | §15: Cohen's d ∝ √t under R3b | §17.10: √t comes from fault arrival rate, not from within-fault propagation |
 | §15.7: PhenomDecoder breaks G1 better than LookupDecoder | §17.10: G1 overlap 0.467 — leaves more room for any decoder that uses non-multiset structure |
+
+---
+
+## 18. Sequence-level equivalence classes (from `pmDAM` branch)
+
+The 387 deterministic fault patterns in [`data/analysis/fault_enumeration/`](data/analysis/fault_enumeration/) (see §17.2) can be partitioned into equivalence classes by **which syndrome bits they produce**. Two natural groupings give a clean contrast.
+
+### 18.1 Two groupings
+
+| Grouping | Equality criterion | # equivalence classes | Largest class |
+|---|---|---|---|
+| **Full d-round** | Identical `(n_rounds, 8)` syndrome array | 56 | **16** (= silent class) |
+| **Last-round only** | Identical final 8-bit syndrome | 35 – 37 | **56** |
+
+Files produced by [`scripts/analyze_fault_enumeration_grouping.py`](scripts/analyze_fault_enumeration_grouping.py):
+
+- `data/analysis/fault_enumeration_grouping/full_sequence_groups_reset.{csv,png}`
+- `data/analysis/fault_enumeration_grouping/last_syndrome_groups_{reset,noreset}.{csv,png}`
+- `data/analysis/fault_enumeration_grouping/group_size_summary.png`
+
+### 18.2 Why the contrast matters
+
+If a decoder/classifier saw **only the last round**, ~37 distinct "fingerprints" would map to 387 underlying fault cases — and one fingerprint alone would conflate **56 cases**. Using the full d-round sequence cuts that down to 56 classes with a largest-group size of 16. The drop (56 → 16) quantifies how much the **intermediate rounds 1, 2** contribute beyond the final state.
+
+This is the deterministic counterpart to §15's noisy sequence-level separability and §17.7's R1 ambiguity-group analysis. It also predicts the §17.10 finding that per-fault information **saturates at T = 2**: by the second round, the sequence-level equivalence has already shrunk to its asymptotic 56 classes.
+
+### 18.3 Cross-reference
+
+| Source | Statement |
+|---|---|
+| §17.3 silent class (16 cases) | Same 16 cases are the largest **full-sequence** equivalence class here |
+| §17.4 per-CNOT uniqueness | A CNOT is "internally unique" iff each of its 15 Paulis lives in a distinct full-sequence class |
+| §17.7 R1 ambiguity groups | The 4 R1 groups appear as sets of full-sequence-equivalent atoms within the appropriate Pauli pool |
+| §16 classifier accuracy | The 56-class ceiling bounds any classifier that consumes only the d-round window; longer T helps via §17.10's Bernoulli-count mechanism, not by enlarging the per-window class set |
