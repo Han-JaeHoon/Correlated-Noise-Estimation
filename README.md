@@ -4,6 +4,16 @@ A research codebase for analyzing whether the **location of a faulty CNOT gate**
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
 
+> **Repository layout — three branches**
+>
+> | Branch | Scope |
+> |---|---|
+> | **`main`** (this branch) | Problem statement + simulator + baseline single-round 216-case sweep (§§1–11) + foundational 387-atom deterministic enumeration (`data/analysis/fault_enumeration/`) |
+> | **`sequential-data-analysis`** | Time-cumulative line: long-sequence syndrome streams, R1/R2/R3b decoders, §15 separability, §16 Task #6 classifier (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration-pattern analyses |
+> | **`spatial-data-analysis`** | Statistical-bag line: 387 atoms as mixture components, §12 pairwise-TV ambiguity (24/24 distinguishable), §13 ML training dataset, set-classifier learning (next) |
+>
+> History before consolidation is preserved as `archive/*` tags locally; the original branches (`fault-enumeration-*`, `pmDAM`, `long-sequence-analysis`, `decoder-add-analysis`, `dreamy-brahmagupta-*`) were merged into the appropriate analysis branch and then retired.
+
 ---
 
 ## 1. Research Goal
@@ -62,12 +72,14 @@ At toy `d=3` a lookup table works, but the table cost explodes with code distanc
     ├── mid_measure_no_reset/           # forward-sim data (mode 2)
     ├── no_mid_measure_final_sample/    # forward-sim data (mode 3)
     ├── no_mid_measure_final_probs/     # forward-sim data (mode 4)
-    └── analysis/                       # analysis results (output of this study)
-        ├── 1_per_pauli_degeneracy/
-        ├── 2_pauli_sweep_summary/
-        ├── 3_cross_pauli_conflict/
-        ├── 4_cross_pauli_per_pauli_view/
-        └── 5_cross_pauli_pair_collisions/
+    └── analysis/
+        ├── 1_per_pauli_degeneracy/        # §6.1, baseline single-Pauli
+        ├── 2_pauli_sweep_summary/         # §6.2
+        ├── 3_cross_pauli_conflict/        # §6.3
+        ├── 4_cross_pauli_per_pauli_view/  # §6.4
+        ├── 5_cross_pauli_pair_collisions/ # §6.5 — 72 pairs
+        └── fault_enumeration/             # 387 deterministic atoms
+                                           # (built by scripts/build_fault_enumeration_table.py)
 ```
 
 ---
