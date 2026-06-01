@@ -115,7 +115,7 @@ def plot_accuracy_vs_N():
                  f"(noreset, d=3, p_high=0.1, p_bg=0.01)", fontsize=11)
     ax.set_xticks(N_LIST)
     ax.get_xaxis().set_major_formatter(mticker.ScalarFormatter())
-    ax.set_ylim(0, 0.65)
+    ax.set_ylim(0, 1.0)
     ax.legend(fontsize=10, loc="upper left")
     ax.grid(True, alpha=0.3)
 
