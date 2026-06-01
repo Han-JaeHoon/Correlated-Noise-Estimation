@@ -1,0 +1,32 @@
+Spatial mixture ambiguity
+  backend=exact  mode=reset  d=3
+  p_high=0.01  p_bg=0.0
+  dominant locations: 24
+  TV threshold: 1.00e-10  (exact (numerical zero))
+  ambiguity groups: 24
+
+Groups (size, members):
+  ok    [ 1] cnot00
+  ok    [ 1] cnot01
+  ok    [ 1] cnot02
+  ok    [ 1] cnot03
+  ok    [ 1] cnot04
+  ok    [ 1] cnot05
+  ok    [ 1] cnot06
+  ok    [ 1] cnot07
+  ok    [ 1] cnot08
+  ok    [ 1] cnot09
+  ok    [ 1] cnot10
+  ok    [ 1] cnot11
+  ok    [ 1] cnot12
+  ok    [ 1] cnot13
+  ok    [ 1] cnot14
+  ok    [ 1] cnot15
+  ok    [ 1] cnot16
+  ok    [ 1] cnot17
+  ok    [ 1] cnot18
+  ok    [ 1] cnot19
+  ok    [ 1] cnot20
+  ok    [ 1] cnot21
+  ok    [ 1] cnot22
+  ok    [ 1] cnot23

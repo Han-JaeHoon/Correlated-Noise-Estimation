@@ -1,0 +1,144 @@
+{
+  "shape_shots": [
+    24000,
+    3,
+    8
+  ],
+  "shape_labels": [
+    24000
+  ],
+  "dtype_shots": "int8",
+  "dtype_labels": "int8",
+  "n_total": 24000,
+  "n_classes": 24,
+  "per_class": {
+    "cnot00": {
+      "n": 1000,
+      "vacuum_frac": 0.31,
+      "mean_bits_per_shot": 2.398
+    },
+    "cnot01": {
+      "n": 1000,
+      "vacuum_frac": 0.317,
+      "mean_bits_per_shot": 2.394
+    },
+    "cnot02": {
+      "n": 1000,
+      "vacuum_frac": 0.32,
+      "mean_bits_per_shot": 2.585
+    },
+    "cnot03": {
+      "n": 1000,
+      "vacuum_frac": 0.321,
+      "mean_bits_per_shot": 2.548
+    },
+    "cnot04": {
+      "n": 1000,
+      "vacuum_frac": 0.32,
+      "mean_bits_per_shot": 2.345
+    },
+    "cnot05": {
+      "n": 1000,
+      "vacuum_frac": 0.33,
+      "mean_bits_per_shot": 2.421
+    },
+    "cnot06": {
+      "n": 1000,
+      "vacuum_frac": 0.348,
+      "mean_bits_per_shot": 2.333
+    },
+    "cnot07": {
+      "n": 1000,
+      "vacuum_frac": 0.295,
+      "mean_bits_per_shot": 2.399
+    },
+    "cnot08": {
+      "n": 1000,
+      "vacuum_frac": 0.301,
+      "mean_bits_per_shot": 2.569
+    },
+    "cnot09": {
+      "n": 1000,
+      "vacuum_frac": 0.308,
+      "mean_bits_per_shot": 2.546
+    },
+    "cnot10": {
+      "n": 1000,
+      "vacuum_frac": 0.327,
+      "mean_bits_per_shot": 2.35
+    },
+    "cnot11": {
+      "n": 1000,
+      "vacuum_frac": 0.305,
+      "mean_bits_per_shot": 2.418
+    },
+    "cnot12": {
+      "n": 1000,
+      "vacuum_frac": 0.33,
+      "mean_bits_per_shot": 2.127
+    },
+    "cnot13": {
+      "n": 1000,
+      "vacuum_frac": 0.335,
+      "mean_bits_per_shot": 2.334
+    },
+    "cnot14": {
+      "n": 1000,
+      "vacuum_frac": 0.329,
+      "mean_bits_per_shot": 2.286
+    },
+    "cnot15": {
+      "n": 1000,
+      "vacuum_frac": 0.332,
+      "mean_bits_per_shot": 2.196
+    },
+    "cnot16": {
+      "n": 1000,
+      "vacuum_frac": 0.308,
+      "mean_bits_per_shot": 2.649
+    },
+    "cnot17": {
+      "n": 1000,
+      "vacuum_frac": 0.324,
+      "mean_bits_per_shot": 2.322
+    },
+    "cnot18": {
+      "n": 1000,
+      "vacuum_frac": 0.316,
+      "mean_bits_per_shot": 2.252
+    },
+    "cnot19": {
+      "n": 1000,
+      "vacuum_frac": 0.332,
+      "mean_bits_per_shot": 2.451
+    },
+    "cnot20": {
+      "n": 1000,
+      "vacuum_frac": 0.317,
+      "mean_bits_per_shot": 2.247
+    },
+    "cnot21": {
+      "n": 1000,
+      "vacuum_frac": 0.32,
+      "mean_bits_per_shot": 2.341
+    },
+    "cnot22": {
+      "n": 1000,
+      "vacuum_frac": 0.315,
+      "mean_bits_per_shot": 2.364
+    },
+    "cnot23": {
+      "n": 1000,
+      "vacuum_frac": 0.337,
+      "mean_bits_per_shot": 2.175
+    }
+  },
+  "overall_vacuum_frac": 0.3207083333333333,
+  "expected_vacuum_lower_bound": 0.2777833490982167,
+  "notes": "vacuum_frac >= expected_lower_bound; difference comes from syndrome cancellation when multiple events XOR to zero.",
+  "split": {
+    "train": 19200,
+    "val": 2400,
+    "test": 2400
+  }
+}

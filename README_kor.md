@@ -1,4 +1,4 @@
-# Correlated-Noise-Estimation
+# Correlated-Noise-Estimation — Spatial Analysis Branch
 
 `d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
 
@@ -6,11 +6,11 @@
 >
 > | 브랜치 | 범위 |
 > |---|---|
-> | **`main`** (현재) | 문제 정의 + 시뮬레이터 + 단일-라운드 216-케이스 baseline sweep (§§1–11) + 387 결정론적 atom enumeration foundation |
+> | **`main`** | 문제 정의 + 시뮬레이터 + 단일-라운드 216-케이스 baseline sweep (§§1–11) + 387 결정론적 atom enumeration foundation |
 > | **`sequential-data-analysis`** | 시간 누적 라인: 긴 syndrome 스트림, R1/R2/R3b decoder, §15 분리 가능성, §16 Task #6 분류기 (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration 패턴 분석 |
 > | **`spatial-data-analysis`** | 통계 누적 라인: 387 atom을 mixture 성분으로 해석, §12 pairwise TV 분석 (24/24 distinguishable), §13 ML 학습 데이터셋, set classifier 학습 (다음 단계) |
 >
-> 정리 전 상태는 `archive/*` 태그로 로컬 보존됨. 원본 브랜치 (`fault-enumeration-*`, `pmDAM`, `long-sequence-analysis`, `decoder-add-analysis`, `dreamy-brahmagupta-*`)는 해당 분석 브랜치에 머지된 후 폐기.
+> §§1–11은 main에서 상속된 baseline 분석입니다. §12 (Spatial mixture ambiguity) 및 §13 (ML dataset)이 spatial 브랜치 고유 기여 — 자세한 내용은 영어 README.md를 참고해주세요.
 
 ---
 
