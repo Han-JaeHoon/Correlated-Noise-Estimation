@@ -30,8 +30,8 @@ AMBIGUITY_GROUPS = [
     frozenset([22, 23]),
 ]
 
-DATA_TAG = "noreset_d3_phigh0.1_pbg0.01_n1000"
-OUT_ROOT = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier"
+DATA_TAG = "noreset_d3_phigh0.1_pbg0.01_n5000"
+OUT_ROOT = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier_n5000"
 
 
 def load_data(tag=DATA_TAG):

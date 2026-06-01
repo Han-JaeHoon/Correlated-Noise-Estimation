@@ -1,0 +1,12 @@
+{
+  "mode": "noreset",
+  "d": 3,
+  "p_high": 0.1,
+  "p_bg": 0.01,
+  "n_per_class": 5000,
+  "val_frac": 0.1,
+  "test_frac": 0.1,
+  "seed": 42,
+  "tag": null,
+  "atom_source": "data/analysis/fault_enumeration/fault_enumeration_table.npz"
+}

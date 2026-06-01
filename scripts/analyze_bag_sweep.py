@@ -23,7 +23,7 @@ import matplotlib.ticker as mticker
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-OUT_DIR = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier"
+OUT_DIR = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier_n5000"
 PLOT_DIR = OUT_DIR / "plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 

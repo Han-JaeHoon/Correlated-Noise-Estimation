@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-OUT_ROOT = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier"
+OUT_ROOT = PROJECT_ROOT / "data" / "analysis" / "spatial_mixture" / "set_classifier_n5000"
 
 DEFAULT_MODELS = ["empirical_bayes", "logreg", "mlp", "deepsets"]
 DEFAULT_N = [1, 3, 10, 30, 100, 300]
