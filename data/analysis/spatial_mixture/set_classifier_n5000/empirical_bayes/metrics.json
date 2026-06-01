@@ -1,0 +1,41 @@
+{
+  "model": "empirical_bayes",
+  "results": {
+    "1": {
+      "accuracy": 0.088,
+      "N": 1,
+      "n_bags": 500,
+      "time_s": 0.04
+    },
+    "3": {
+      "accuracy": 0.102,
+      "N": 3,
+      "n_bags": 500,
+      "time_s": 0.02
+    },
+    "10": {
+      "accuracy": 0.132,
+      "N": 10,
+      "n_bags": 500,
+      "time_s": 0.02
+    },
+    "30": {
+      "accuracy": 0.138,
+      "N": 30,
+      "n_bags": 500,
+      "time_s": 0.02
+    },
+    "100": {
+      "accuracy": 0.296,
+      "N": 100,
+      "n_bags": 500,
+      "time_s": 0.02
+    },
+    "300": {
+      "accuracy": 0.42,
+      "N": 300,
+      "n_bags": 500,
+      "time_s": 0.03
+    }
+  }
+}
