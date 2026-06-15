@@ -4,15 +4,58 @@ A research codebase for analyzing whether the **location of a faulty CNOT gate**
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
 
-> **Repository layout — three branches**
+> **This is the `main` branch — the repository index.** It maps both research
+> phases and points to the branch where each line of work lives. §§1–11 below
+> are kept here as the **Phase 0 baseline reference** (inherited unchanged).
+
+## 0. Repository map — two phases
+
+The project is split into two generations of the surface-code model, each in its
+own branch namespace.
+
+### Phase 0 — naive surface code (`0_naiveSurfaceCode/*`) — frozen
+
+PennyLane state-vector simulator, `d=3` hardcoded, **sequential** per-stabilizer
+measurement schedule. Validated toy results; no longer developed.
+
+| Branch | Scope | Headline result |
+|---|---|---|
+| `0_naiveSurfaceCode/baseline` | Problem statement + simulator + single-round 216-case sweep + 387-atom deterministic enumeration (§§1–11 below) | **72** cross-Pauli (CNOT, Pauli) collisions → single-shot identification is information-theoretically impossible |
+| `0_naiveSurfaceCode/sequential` | Time-cumulative line: long `(T, 8)` syndrome streams, R1/R2/R3b decoders, §13 R1 ceiling, §15 √t separability, §16 classifier, §17/§18 enumeration patterns | R1 ceiling 18/24 = 0.75; **R2/GRU 95.3 %, R3b/GRU 91.2 %** break the ceiling |
+| `0_naiveSurfaceCode/spatial` | Statistical-bag line: 387 atoms as a mixture distribution, §12 pairwise-TV ambiguity, §13 ML dataset, bag-of-shots classifier | **24 / 24 distinguishable**; LogReg **93.9 %** at N = 300 shots/bag |
+| `0_naiveSurfaceCode/spatial-prebag` | Snapshot of the spatial line *before* the bag-classifier work (preserved; was `spatial-data-analysis`) | — |
+
+### Phase 1 — realistic surface code (`1_realisticSurfaceCode`) — active
+
+Migrates the backend to **Stim**, adopts the **constant-depth parallel**
+stabilizer schedule that real surface codes run, and parameterizes **general
+`d`**. Re-runs the Phase 0 sequential and spatial pipelines on the realistic
+circuit, and extends the spatial analysis to **`d·k`-round windows**
+(`k ∈ {1, 2, 3}`, no decoding). See [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md)
+on that branch for the roadmap.
+
+### Branch rename map (old → new)
+
+The reorganization renamed the pre-existing branches; each new name points to the
+**identical commit** (no history or data was rewritten).
+
+| Old name | New name |
+|---|---|
+| `main` (baseline content) | `0_naiveSurfaceCode/baseline` (snapshot) + this index |
+| `sequential-data-analysis` | `0_naiveSurfaceCode/sequential` |
+| `spatial-data-analysis-phase` | `0_naiveSurfaceCode/spatial` |
+| `spatial-data-analysis` | `0_naiveSurfaceCode/spatial-prebag` |
+| `stim-realistic-general-d` | `1_realisticSurfaceCode` |
+
+> **Pending manual cleanup.** The old branch names still exist as duplicate
+> pointers — this environment's git proxy blocks ref deletion, so they could not
+> be removed automatically. They are safe to delete (every commit is reachable
+> from the new names) with:
 >
-> | Branch | Scope |
-> |---|---|
-> | **`main`** (this branch) | Problem statement + simulator + baseline single-round 216-case sweep (§§1–11) + foundational 387-atom deterministic enumeration (`data/analysis/fault_enumeration/`) |
-> | **`sequential-data-analysis`** | Time-cumulative line: long-sequence syndrome streams, R1/R2/R3b decoders, §15 separability, §16 Task #6 classifier (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration-pattern analyses |
-> | **`spatial-data-analysis`** | Statistical-bag line: 387 atoms as mixture components, §12 pairwise-TV ambiguity (24/24 distinguishable), §13 ML training dataset, set-classifier learning (next) |
->
-> History before consolidation is preserved as `archive/*` tags locally; the original branches (`fault-enumeration-*`, `pmDAM`, `long-sequence-analysis`, `decoder-add-analysis`, `dreamy-brahmagupta-*`) were merged into the appropriate analysis branch and then retired.
+> ```bash
+> git push origin --delete sequential-data-analysis spatial-data-analysis \
+>     spatial-data-analysis-phase stim-realistic-general-d
+> ```
 
 ---
 

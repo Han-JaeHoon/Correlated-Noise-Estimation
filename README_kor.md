@@ -2,15 +2,56 @@
 
 `d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
 
-> **저장소 구성 — 3개 브랜치**
+> **이 브랜치는 `main` — 저장소 인덱스입니다.** 두 연구 phase를 정리하고 각
+> 작업이 있는 브랜치로 안내합니다. 아래 §§1–11은 **Phase 0 baseline 참조용**으로
+> 그대로 보존되어 있습니다.
+
+## 0. 저장소 맵 — 두 개의 phase
+
+이 프로젝트는 surface code 모델의 두 세대로 나뉘며, 각각 고유한 브랜치
+네임스페이스를 가집니다.
+
+### Phase 0 — naive surface code (`0_naiveSurfaceCode/*`) — 동결
+
+PennyLane state-vector 시뮬레이터, `d=3` 하드코딩, **순차(sequential)** stabilizer
+측정 스케줄. 검증 완료된 toy 결과이며 더 이상 개발하지 않음.
+
+| 브랜치 | 범위 | 핵심 결과 |
+|---|---|---|
+| `0_naiveSurfaceCode/baseline` | 문제 정의 + 시뮬레이터 + 단일-라운드 216-케이스 sweep + 387 결정론적 atom enumeration (아래 §§1–11) | **72**개 cross-Pauli (CNOT, Pauli) 충돌 → 단일-shot 식별은 정보이론적으로 불가능 |
+| `0_naiveSurfaceCode/sequential` | 시간 누적 라인: 긴 `(T, 8)` syndrome 스트림, R1/R2/R3b decoder, §13 R1 ceiling, §15 √t 분리가능성, §16 분류기, §17/§18 enumeration 패턴 | R1 ceiling 18/24 = 0.75; **R2/GRU 95.3 %, R3b/GRU 91.2 %** 로 ceiling 돌파 |
+| `0_naiveSurfaceCode/spatial` | 통계 bag 라인: 387 atom을 mixture 분포로 해석, §12 pairwise-TV ambiguity, §13 ML 데이터셋, bag-of-shots 분류기 | **24 / 24 구별 가능**; N = 300 shots/bag 에서 LogReg **93.9 %** |
+| `0_naiveSurfaceCode/spatial-prebag` | bag 분류기 작업 *이전* 의 spatial 라인 스냅샷 (보존용; 옛 `spatial-data-analysis`) | — |
+
+### Phase 1 — realistic surface code (`1_realisticSurfaceCode`) — 활성
+
+백엔드를 **Stim**으로 이전하고, 실제 surface code가 돌리는 **constant-depth 병렬**
+stabilizer 스케줄을 채택하며, **일반 `d`**로 파라미터화. Phase 0의 sequential·spatial
+파이프라인을 현실적 회로 위에서 재실행하고, spatial 분석을 **`d·k` 라운드 윈도우**
+(`k ∈ {1, 2, 3}`, 무디코딩)로 확장. 로드맵은 해당 브랜치의
+[`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md) 참조.
+
+### 브랜치 이름 변경 맵 (old → new)
+
+재정리로 기존 브랜치들의 이름을 바꿨으며, 각 새 이름은 **동일한 커밋**을 가리킵니다
+(히스토리·데이터를 다시 쓰지 않음).
+
+| 옛 이름 | 새 이름 |
+|---|---|
+| `main` (baseline 내용) | `0_naiveSurfaceCode/baseline` (스냅샷) + 이 인덱스 |
+| `sequential-data-analysis` | `0_naiveSurfaceCode/sequential` |
+| `spatial-data-analysis-phase` | `0_naiveSurfaceCode/spatial` |
+| `spatial-data-analysis` | `0_naiveSurfaceCode/spatial-prebag` |
+| `stim-realistic-general-d` | `1_realisticSurfaceCode` |
+
+> **수동 정리 필요.** 옛 브랜치 이름들은 아직 중복 포인터로 남아 있습니다 — 이
+> 환경의 git 프록시가 ref 삭제를 막아 자동 제거가 불가능했습니다. 모든 커밋이 새
+> 이름에서 reachable하므로 안전하게 삭제할 수 있습니다:
 >
-> | 브랜치 | 범위 |
-> |---|---|
-> | **`main`** (현재) | 문제 정의 + 시뮬레이터 + 단일-라운드 216-케이스 baseline sweep (§§1–11) + 387 결정론적 atom enumeration foundation |
-> | **`sequential-data-analysis`** | 시간 누적 라인: 긴 syndrome 스트림, R1/R2/R3b decoder, §15 분리 가능성, §16 Task #6 분류기 (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration 패턴 분석 |
-> | **`spatial-data-analysis`** | 통계 누적 라인: 387 atom을 mixture 성분으로 해석, §12 pairwise TV 분석 (24/24 distinguishable), §13 ML 학습 데이터셋, set classifier 학습 (다음 단계) |
->
-> 정리 전 상태는 `archive/*` 태그로 로컬 보존됨. 원본 브랜치 (`fault-enumeration-*`, `pmDAM`, `long-sequence-analysis`, `decoder-add-analysis`, `dreamy-brahmagupta-*`)는 해당 분석 브랜치에 머지된 후 폐기.
+> ```bash
+> git push origin --delete sequential-data-analysis spatial-data-analysis \
+>     spatial-data-analysis-phase stim-realistic-general-d
+> ```
 
 ---
 
