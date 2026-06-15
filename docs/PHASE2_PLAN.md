@@ -65,14 +65,20 @@ only for optional future decoding.
       Empirically verified d=3/5/7 layout, 4-tick parallel schedule, CNOT
       directions, `(R, d²−1)` reshape, and the round-0 projection difference vs
       Phase 0. Full write-up: [`PHASE2_DESIGN.md`](PHASE2_DESIGN.md).
-- [ ] **2-3** Parameterize general d (`src/backend_stim/circuit.py`) — schedule
-      wrapper + layout + per-round CNOT enumeration
-- [ ] **2-1** Fault injection: insert a Pauli after a specific CNOT (`src/backend_stim/fault_inject.py`)
+- [x] **2-3** General-d surface code — **done**.
+      First-principles construction in `src/backend_stim/surface_code.py`
+      (`RotatedSurfaceCode(d)`), constant 4-tick depth for all d, validated
+      bit-for-bit against Stim (ancilla set + schedule) plus distance and
+      logical-error-rate checks for d=3/5/7. See
+      [`SURFACE_CODE_IMPL.md`](SURFACE_CODE_IMPL.md);
+      run `python scripts/validate_surface_code.py`.
+- [x] **2-1** Fault injection — **done** (deterministic). `build_circuit(injections=…)`
+      applies single-qubit data Paulis (pre-round) and 2-qubit post-CNOT Paulis
+      (hook errors). Stochastic `PAULI_CHANNEL_2` p_bg/p_high sampling: still to add.
+- [ ] **2-viz** Web visualization of how the code works — **done** (this milestone):
+      `viz/surface_code.html` (self-contained), data-faithful to the simulator.
 - [ ] **2-2** Reproduce single-fault enumeration in Stim; compare **structure** to
       Phase 0's 387 atoms (**sanity check** — structure expected to differ)
 - [ ] **2-4** Generate spatial bags on Stim; re-run `bag_classifier`
 - [ ] **2-5** Extend spatial to d·k rounds (k=1,2,3), no decoder; accuracy vs (N, k, d)
 - [ ] **2-6** Re-run sequential pipeline on Stim
-
-(2-3 now precedes 2-1/2-2: the general-d circuit wrapper is the dependency for
-fault injection and enumeration.)
