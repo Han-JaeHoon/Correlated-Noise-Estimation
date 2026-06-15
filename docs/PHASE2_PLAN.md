@@ -1,6 +1,6 @@
 # Phase 2 — Realistic Surface Code on Stim (general d)
 
-This branch (`stim-realistic-general-d`) migrates the simulation backend from
+This branch (`1_realisticSurfaceCode`) migrates the simulation backend from
 PennyLane (state-vector, d=3 hardcoded, sequential stabilizer schedule) to
 **Stim** (Clifford stabilizer simulator) in order to:
 
@@ -24,13 +24,18 @@ which is exactly Stim's exact (non-approximate) domain. Stim gives:
 
 ## Phase 1 vs Phase 2
 
-| | Phase 1 (frozen) | Phase 2 (this branch) |
+| | Phase 0 (frozen) | Phase 1 / Phase 2 (this branch) |
 |---|---|---|
-| Branches | main, sequential-data-analysis, spatial-data-analysis, spatial-data-analysis-phase | stim-realistic-general-d |
+| Branches | `0_naiveSurfaceCode/{baseline,sequential,spatial,spatial-prebag}` | `1_realisticSurfaceCode` |
 | Backend | PennyLane state-vector | Stim |
 | Schedule | sequential per-stabilizer | constant-depth 4-step parallel |
 | Distance | d=3 hardcoded | general d |
 | Status | validated toy results (fail / GRU 95.3% / LogReg 93.9%) | in progress |
+
+> Naming note: the original docs called the naive line "Phase 1" and the
+> realistic line "Phase 2". After the branch reorg these are the
+> `0_naiveSurfaceCode/*` (frozen) and `1_realisticSurfaceCode` (active)
+> namespaces; "Phase 2" below refers to the work on this branch.
 
 ## Confirmed: Stim schedule (d=3, rounds=1)
 
@@ -46,16 +51,28 @@ MR <8 ancillas>
 DETECTOR ...   # 24 detectors for rounds=3 = 3 rounds × 8 stabilizers
 ```
 
-d=3 produces **24 detectors over 3 rounds = our existing (3, 8) format** — the
-downstream analysis pipeline (`bag_classifier.py`, training/sweep/confusion
-scripts) attaches with only a reshape.
+For d=3 we read the **raw ancilla MR records** (`8·R` of them) and reshape to the
+existing **`(R, 8)` syndrome format** — the downstream analysis pipeline
+(`bag_classifier.py`, training/sweep/confusion scripts) attaches with only a
+reshape. We bypass Stim's `DETECTOR`/`OBSERVABLE` layer for the syndrome tensor
+because Stim's detector set is basis-asymmetric (round-0 X-stabs random; see
+[`PHASE2_DESIGN.md`](PHASE2_DESIGN.md) §2.3–2.4). The detector/DEM path is kept
+only for optional future decoding.
 
 ## Roadmap
 
-- [ ] **2-0** Inspect Stim layout / CNOT schedule / detector mapping  ← done (this doc)
+- [x] **2-0** Inspect Stim layout / CNOT schedule / measurement mapping — **done**.
+      Empirically verified d=3/5/7 layout, 4-tick parallel schedule, CNOT
+      directions, `(R, d²−1)` reshape, and the round-0 projection difference vs
+      Phase 0. Full write-up: [`PHASE2_DESIGN.md`](PHASE2_DESIGN.md).
+- [ ] **2-3** Parameterize general d (`src/backend_stim/circuit.py`) — schedule
+      wrapper + layout + per-round CNOT enumeration
 - [ ] **2-1** Fault injection: insert a Pauli after a specific CNOT (`src/backend_stim/fault_inject.py`)
-- [ ] **2-2** Reproduce single-fault enumeration in Stim; compare structure to Phase 1's 387 atoms (**sanity check**)
-- [ ] **2-3** Parameterize general d (`src/backend_stim/circuit.py`)
+- [ ] **2-2** Reproduce single-fault enumeration in Stim; compare **structure** to
+      Phase 0's 387 atoms (**sanity check** — structure expected to differ)
 - [ ] **2-4** Generate spatial bags on Stim; re-run `bag_classifier`
-- [ ] **2-5** Extend spatial to d·k rounds (k=1,2,3), no decoder; accuracy vs (N, k)
+- [ ] **2-5** Extend spatial to d·k rounds (k=1,2,3), no decoder; accuracy vs (N, k, d)
 - [ ] **2-6** Re-run sequential pipeline on Stim
+
+(2-3 now precedes 2-1/2-2: the general-d circuit wrapper is the dependency for
+fault injection and enumeration.)

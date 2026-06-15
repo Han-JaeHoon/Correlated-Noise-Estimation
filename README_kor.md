@@ -1,16 +1,16 @@
-# Correlated-Noise-Estimation — Spatial Analysis Branch
+# Correlated-Noise-Estimation — `1_realisticSurfaceCode` (Phase 2, 활성)
 
-`d=3` rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
+rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때, syndrome 측정 시퀀스만으로 해당 CNOT 위치를 식별**할 수 있는지 분석하고, 그 결과를 바탕으로 학습 모델을 설계하기 위한 연구 코드.
 
-> **저장소 구성 — 3개 브랜치**
+> **이 브랜치는 Phase 2 활성 브랜치입니다.** 백엔드를 **Stim**으로, 스케줄을
+> **constant-depth 병렬**로, 거리를 **일반 `d`**로 이전한 뒤, Phase 0 분석을
+> 현실적 회로에서 재실행하고 spatial 분석을 `d·k` 라운드 윈도우로 확장합니다.
 >
-> | 브랜치 | 범위 |
-> |---|---|
-> | **`main`** | 문제 정의 + 시뮬레이터 + 단일-라운드 216-케이스 baseline sweep (§§1–11) + 387 결정론적 atom enumeration foundation |
-> | **`sequential-data-analysis`** | 시간 누적 라인: 긴 syndrome 스트림, R1/R2/R3b decoder, §15 분리 가능성, §16 Task #6 분류기 (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration 패턴 분석 |
-> | **`spatial-data-analysis`** | 통계 누적 라인: 387 atom을 mixture 성분으로 해석, §12 pairwise TV 분석 (24/24 distinguishable), §13 ML 학습 데이터셋, set classifier 학습 (다음 단계) |
+> - **설계 + 로드맵**: [`docs/PHASE2_DESIGN.md`](docs/PHASE2_DESIGN.md) (Step 0 조사/근거), [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md) (로드맵 2-0…2-6).
+> - **Phase 0 (동결, 검증된 toy 결과)** 는 `0_naiveSurfaceCode/*` 브랜치에 있고, phase 간 인덱스는 `main`에 있습니다.
 >
-> §§1–11은 main에서 상속된 baseline 분석입니다. §12 (Spatial mixture ambiguity) 및 §13 (ML dataset)이 spatial 브랜치 고유 기여 — 자세한 내용은 영어 README.md를 참고해주세요.
+> 아래 §§1–13은 **상속된 Phase 0 spatial 참조**(PennyLane d=3)로, Stim 백엔드가
+> 완성될 때까지 연속성을 위해 보존됩니다. 아직 현실적 회로를 반영하지 않습니다.
 
 ---
 

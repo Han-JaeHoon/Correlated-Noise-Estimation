@@ -1,18 +1,23 @@
-# Correlated-Noise-Estimation — Spatial Analysis Branch
+# Correlated-Noise-Estimation — `1_realisticSurfaceCode` (Phase 2, active)
 
-A research codebase for analyzing whether the **location of a faulty CNOT gate** acting as a dominant noise source in a `d=3` rotated surface code can be **identified from syndrome measurement sequences alone**, and for designing a learning model on top of those findings.
+A research codebase for analyzing whether the **location of a faulty CNOT gate**
+acting as a dominant noise source in a rotated surface code can be **identified
+from syndrome measurement sequences alone**, and for designing a learning model
+on top of those findings.
 
 (See [`README_kor.md`](README_kor.md) for the Korean version.)
 
-> **Repository layout — three branches**
+> **This is the Phase 2 active branch.** It migrates the backend to **Stim**, the
+> **constant-depth parallel** stabilizer schedule, and **general `d`**, then
+> re-runs the Phase 0 analyses on the realistic circuit and extends the spatial
+> analysis to `d·k`-round windows.
 >
-> | Branch | Scope |
-> |---|---|
-> | **`main`** | Problem statement + simulator + baseline single-round 216-case sweep (§§1–11) + foundational 387-atom deterministic enumeration (`data/analysis/fault_enumeration/`) |
-> | **`sequential-data-analysis`** | Time-cumulative line: long-sequence syndrome streams, R1/R2/R3b decoders, §15 separability, §16 Task #6 classifier (R2/GRU 95.3 %, R3b/GRU 91.2 %), §17/§18 enumeration-pattern analyses |
-> | **`spatial-data-analysis`** | Statistical-bag line: 387 atoms as mixture components, §12 pairwise-TV ambiguity (24/24 distinguishable), §13 ML training dataset, set-classifier learning (next) |
+> - **Design + roadmap**: [`docs/PHASE2_DESIGN.md`](docs/PHASE2_DESIGN.md) (Step 0 research/grounding), [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md) (roadmap 2-0…2-6).
+> - **Phase 0 (frozen, validated toy results)** lives in the `0_naiveSurfaceCode/*` branches; the cross-phase index is on `main`.
 >
-> §§1–11 describe the baseline analysis (inherited from `main`). §12 (Spatial mixture ambiguity) and §13 (ML dataset) are the spatial branch's contributions.
+> §§1–13 below are the **inherited Phase 0 spatial reference** (PennyLane d=3),
+> kept for continuity while the Stim backend is built. They do not yet reflect the
+> realistic circuit.
 
 ---
 
