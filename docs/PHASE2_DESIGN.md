@@ -1,5 +1,7 @@
 # Phase 2 — Design (Step 0: research + empirical grounding)
 
+> 한국어: [`PHASE2_DESIGN_kor.md`](PHASE2_DESIGN_kor.md)
+
 Status: **design fixed, no backend code yet.** This document is the output of
 roadmap item **2-0**. It pins down the realistic-circuit design before any
 `src/backend_stim/` code is written, grounded in (a) prior work on

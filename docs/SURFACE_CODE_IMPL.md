@@ -1,5 +1,7 @@
 # General distance-d surface code — implementation & validation
 
+> 한국어: [`SURFACE_CODE_IMPL_kor.md`](SURFACE_CODE_IMPL_kor.md)
+
 This documents the Phase 2 backend's first-principles rotated surface code
 (`src/backend_stim/surface_code.py`), the rationale behind it, the evidence that
 it is correct, and the web visualization built on top of it. It satisfies

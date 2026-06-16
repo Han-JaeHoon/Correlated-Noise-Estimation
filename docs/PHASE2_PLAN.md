@@ -1,5 +1,7 @@
 # Phase 2 — Realistic Surface Code on Stim (general d)
 
+> 한국어: [`PHASE2_PLAN_kor.md`](PHASE2_PLAN_kor.md)
+
 This branch (`1_realisticSurfaceCode`) migrates the simulation backend from
 PennyLane (state-vector, d=3 hardcoded, sequential stabilizer schedule) to
 **Stim** (Clifford stabilizer simulator) in order to:
