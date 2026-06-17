@@ -1,0 +1,13 @@
+Stim single-fault syndrome enumeration  d=3
+  round 0 = fault-free projection (|0...0> -> |0_L>), round 1 = single fault; Z-basis, seed=12345
+  ancillas (syndrome length) = 8
+
+total cases            : 387
+  data single-Pauli    : 27  (unique syndromes 23)
+  CNOT two-Pauli       : 360  (unique syndromes 36)
+unique syndromes (all) : 36
+silent (all-zero) cases: 89
+max degeneracy class   : 89
+
+silent cases:
+  C0_ZZ, C1_XI, C1_YZ, C1_ZZ, C2_XI, C2_YZ, C2_ZZ, C3_XX, C4_IZ, C4_XX, C4_XY, C5_XX, C6_XI, C7_IZ, C8_ZI, C9_IZ, C9_XI, C9_XZ, C11_IX, C11_IY, C11_IZ, C12_IZ, C12_XI, C12_XZ, C13_IZ, C13_XI, C13_XZ, C13_YI, C13_YZ, C13_ZI, C13_ZZ, C14_IZ, C14_XI, C14_XZ, C15_IZ, C15_XI, C15_XZ, C16_IZ, C16_XI, C16_XZ, C17_IX, C17_IY, C17_IZ, C17_XI, C17_XX, C17_XY, C17_XZ, C18_IZ, C18_XI, C18_XZ, C18_YI, C18_YZ, C18_ZI, C18_ZZ, C19_IZ, C19_XI, C19_XZ, C19_YI, C19_YZ, C19_ZI, C19_ZZ, C20_IZ, C20_XI, C20_XZ, C20_YI, C20_YZ, C20_ZI, C20_ZZ, C21_IX, C21_IY, C21_IZ, C21_XI, C21_XX, C21_XY, C21_XZ, C22_IX, C22_IY, C22_IZ, C22_XI, C22_XX, C22_XY, C22_XZ, C23_IX, C23_IY, C23_IZ, C23_XI, C23_XX, C23_XY, C23_XZ

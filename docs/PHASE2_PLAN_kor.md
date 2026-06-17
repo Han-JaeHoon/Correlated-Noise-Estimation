@@ -76,8 +76,16 @@ confusion 스크립트)이 reshape만으로 붙습니다. syndrome 텐서에는 
       적용. stochastic `PAULI_CHANNEL_2` p_bg/p_high 샘플링은 추가 예정.
 - [ ] **2-viz** 코드 작동 방식 웹 시각화 — **완료** (이번 마일스톤):
       `viz/surface_code.html`(자체 완결), 시뮬레이터와 데이터 일치.
-- [ ] **2-2** Stim에서 single-fault enumeration 재현; Phase 0 387 atom과 **구조**
-      비교 (**sanity check** — 구조는 다를 것으로 예상)
+- [~] **2-2** Stim에서 single-fault enumeration 재현 — **enumeration 완료**;
+      Phase 0 387 atom 구조 비교는 미완.
+      `scripts/build_stim_fault_enumeration.py`가 결함 없는 projection 라운드
+      (round 0 = `|0…0⟩ → |0_L⟩`) 뒤에 단일 결함 라운드(round 1)를 두고, 각 결함의
+      신드롬(보조 flip 패턴, 같은 seed 차분 XOR)을 기록. case: data 단일 Pauli
+      (data qubit당 X/Y/Z) + 2-큐비트 Pauli(directed CNOT당 15종). 출력:
+      `data/analysis/stim_fault_enumeration/d{3,5}/{enumeration.csv,syndromes.npz,summary.txt}`.
+      d=3: 387 case → 고유 36, silent 89. d=5: 1275 → 고유 168, silent 261.
+      **남은 작업:** Phase 0 387-atom 테이블과 구조 비교(병렬 스케줄에서 충돌/silent
+      클래스가 어떻게 바뀌는지) — 실제 sanity check.
 - [ ] **2-4** Stim에서 spatial bag 생성; `bag_classifier` 재실행
 - [ ] **2-5** spatial을 d·k 라운드(k=1,2,3)로 확장, 무디코더; (N, k, d) 대비 정확도
 - [ ] **2-6** sequential 파이프라인 Stim에서 재실행

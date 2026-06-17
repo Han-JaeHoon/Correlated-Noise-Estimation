@@ -21,6 +21,56 @@ on top of those findings.
 
 ---
 
+## Phase 2 progress (realistic Stim circuit)
+
+Roadmap and full detail in [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md). Status at a glance:
+
+| Milestone | Status |
+|---|---|
+| 2-0 Stim schedule research + design doc | ✅ done |
+| 2-3 general-d surface code (constant 4-tick depth) | ✅ done, validated d=3/5/7 |
+| 2-1 fault injection (deterministic) | ✅ done (stochastic p_bg/p_high pending) |
+| 2-viz self-contained web visualization | ✅ done |
+| **2-2 single-fault syndrome enumeration** | 🔶 **enumeration done** (below); Phase 0 structural comparison pending |
+| 2-4 / 2-5 / 2-6 spatial bags · d·k windows · sequential re-run | ⬜ not started |
+
+### 2-2 · Single-fault syndrome enumeration (`scripts/build_stim_fault_enumeration.py`)
+
+For **one stabilizer-measurement round** on the realistic circuit, every elementary
+fault is enumerated and its syndrome recorded. Because a physical `|0…0⟩` reset is
+**not** an X-stabilizer eigenstate, a fault-free **projection round** (round 0,
+`|0…0⟩ → |0_L⟩`) precedes the single fault round (round 1); the syndrome is the
+round-1 change (detection-event pattern), so it reads all-zero with no fault. This
+is the same projection convention the web viz already uses (`round 0 is the
+projection round`).
+
+Fault cases:
+- **data single-Pauli** — X / Y / Z on each data qubit (pre-round);
+- **CNOT two-Pauli** — each of the 15 non-identity 2-qubit Paulis right after each
+  directed CNOT (post-CNOT, propagates through the rest of the round = hook error).
+
+Syndrome extraction reuses the validated differential method (sample noiseless vs
+fault-injected with the same seed, XOR the raw ancilla records).
+
+| d | ancillas | cases | unique syndromes | silent (all-zero) |
+|---|---|---|---|---|
+| 3 | 8 | 387 (27 data + 360 CNOT) | 36 | 89 |
+| 5 | 24 | 1275 (75 data + 1200 CNOT) | 168 | 261 |
+
+Outputs per distance in `data/analysis/stim_fault_enumeration/d{3,5}/`:
+`enumeration.csv` (one row per fault case), `syndromes.npz` (syndrome matrix
+`N×(d²−1)` int8 + metadata), `summary.txt` (counts + silent list). Regenerate with
+`python scripts/build_stim_fault_enumeration.py` (fixed seed → reproducible).
+
+Example Stim circuits (timeline-svg, generated for reference) live in
+`viz/circuits/` — clean d=3/d=5 rounds and a D0-`Z` fault-injected d=3 circuit.
+
+> **Remaining for 2-2:** compare this table's *structure* (collision / silent
+> classes) against Phase 0's 387-atom table — the parallel schedule changes the
+> fault→syndrome map, so the comparison is the actual sanity check.
+
+---
+
 ## 1. Research Goal
 
 ### 1.1 Big picture

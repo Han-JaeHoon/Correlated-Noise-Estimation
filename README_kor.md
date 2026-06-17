@@ -14,6 +14,54 @@ rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때
 
 ---
 
+## Phase 2 진행 현황 (현실적 Stim 회로)
+
+로드맵·상세는 [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md). 한눈에 보기:
+
+| 마일스톤 | 상태 |
+|---|---|
+| 2-0 Stim 스케줄 조사 + 설계 문서 | ✅ 완료 |
+| 2-3 일반-d 표면부호 (상수 4-tick 깊이) | ✅ 완료, d=3/5/7 검증 |
+| 2-1 결함 주입 (결정론적) | ✅ 완료 (확률적 p_bg/p_high 미구현) |
+| 2-viz 자족형 웹 시각화 | ✅ 완료 |
+| **2-2 단일결함 신드롬 enumeration** | 🔶 **enumeration 완료**(아래); Phase 0 구조 비교 미완 |
+| 2-4 / 2-5 / 2-6 spatial bag · d·k 윈도우 · sequential 재실행 | ⬜ 미착수 |
+
+### 2-2 · 단일결함 신드롬 enumeration (`scripts/build_stim_fault_enumeration.py`)
+
+현실적 회로에서 **stabilizer 측정 1라운드**에 대해 모든 기본 결함을 나열하고 각
+신드롬을 기록합니다. 물리적 `|0…0⟩` reset은 X-stabilizer의 고유상태가 **아니므로**,
+단일 결함 라운드(round 1) 앞에 결함 없는 **projection 라운드**(round 0,
+`|0…0⟩ → |0_L⟩`)를 둡니다. 신드롬은 round 1의 변화(detection-event)라 결함이 없으면
+모두 0입니다. 이는 웹 viz가 이미 쓰던 projection convention과 동일합니다(`round 0이
+projection 라운드`).
+
+결함 종류:
+- **data 단일 Pauli** — 각 data qubit에 X / Y / Z (라운드 시작 시);
+- **CNOT 2-큐비트 Pauli** — 각 directed CNOT 직후 15종(II 제외). 같은 라운드의 이후
+  CNOT들을 거쳐 전파 = hook error.
+
+신드롬 추출은 검증된 차분 방식(무결함 vs 결함 주입을 같은 seed로 샘플 → 보조 측정 XOR)을
+그대로 사용합니다.
+
+| d | 보조 수 | case | 고유 신드롬 | silent(전부 0) |
+|---|---|---|---|---|
+| 3 | 8 | 387 (data 27 + CNOT 360) | 36 | 89 |
+| 5 | 24 | 1275 (data 75 + CNOT 1200) | 168 | 261 |
+
+거리별 출력은 `data/analysis/stim_fault_enumeration/d{3,5}/`:
+`enumeration.csv`(case별 한 줄), `syndromes.npz`(신드롬 행렬 `N×(d²−1)` int8 + 메타),
+`summary.txt`(개수 + silent 목록). `python scripts/build_stim_fault_enumeration.py`로
+재생성(seed 고정 → 재현 가능).
+
+참고용 Stim 회로 그림(timeline-svg)은 `viz/circuits/`에 있습니다 — 깨끗한 d=3/d=5
+라운드와 D0-`Z` 결함 주입 d=3 회로.
+
+> **2-2 남은 작업:** 이 테이블의 *구조*(충돌 / silent 클래스)를 Phase 0의 387-atom
+> 테이블과 비교 — 병렬 스케줄이 fault→syndrome 맵을 바꾸므로 이 비교가 실제 sanity check.
+
+---
+
 ## 1. 연구 목표
 
 ### 1.1 큰 그림

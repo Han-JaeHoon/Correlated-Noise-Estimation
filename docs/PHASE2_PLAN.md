@@ -79,8 +79,17 @@ only for optional future decoding.
       (hook errors). Stochastic `PAULI_CHANNEL_2` p_bg/p_high sampling: still to add.
 - [ ] **2-viz** Web visualization of how the code works — **done** (this milestone):
       `viz/surface_code.html` (self-contained), data-faithful to the simulator.
-- [ ] **2-2** Reproduce single-fault enumeration in Stim; compare **structure** to
-      Phase 0's 387 atoms (**sanity check** — structure expected to differ)
+- [~] **2-2** Reproduce single-fault enumeration in Stim — **enumeration done**;
+      Phase 0 structural comparison still to do.
+      `scripts/build_stim_fault_enumeration.py` runs one stabilizer round preceded
+      by a fault-free projection round (round 0 = `|0…0⟩ → |0_L⟩`; round 1 = single
+      fault) and records each fault's syndrome (raw ancilla flip pattern, via the
+      same-seed differential XOR method). Cases: data single-Pauli (X/Y/Z per data
+      qubit) + 2-qubit Pauli (15 per directed CNOT). Outputs:
+      `data/analysis/stim_fault_enumeration/d{3,5}/{enumeration.csv,syndromes.npz,summary.txt}`.
+      d=3: 387 cases → 36 unique syndromes, 89 silent. d=5: 1275 → 168 unique, 261 silent.
+      **Remaining:** structural diff vs Phase 0's 387-atom table (which collision /
+      silent classes change under the parallel schedule) — the actual sanity check.
 - [ ] **2-4** Generate spatial bags on Stim; re-run `bag_classifier`
 - [ ] **2-5** Extend spatial to d·k rounds (k=1,2,3), no decoder; accuracy vs (N, k, d)
 - [ ] **2-6** Re-run sequential pipeline on Stim
