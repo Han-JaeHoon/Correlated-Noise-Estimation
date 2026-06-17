@@ -25,47 +25,29 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.backend_stim.surface_code import RotatedSurfaceCode  # noqa: E402
 
-ROUNDS = 4
 INJECT_ROUND = 1  # round 0 is the projection round; inject from round 1
 SEED = 12345
 
 
-def raw_syndrome(code: RotatedSurfaceCode, reset: bool, injections):
+def raw_syndrome(code: RotatedSurfaceCode, reset: bool, injections, rounds: int):
     """Return (rounds, n_anc) raw ancilla measurements for one shot."""
-    circ = code.build_circuit(rounds=ROUNDS, basis="Z", reset=reset,
+    circ = code.build_circuit(rounds=rounds, basis="Z", reset=reset,
                               injections=injections)
     n_anc = len(code.anc_coords)
     samp = circ.compile_sampler(seed=SEED).sample(shots=1)[0]
-    anc = samp[: n_anc * ROUNDS].reshape(ROUNDS, n_anc).astype(int)
+    anc = samp[: n_anc * rounds].reshape(rounds, n_anc).astype(int)
     return anc
 
 
-def flip_pattern(code, reset, injections):
-    base = raw_syndrome(code, reset, [])
-    err = raw_syndrome(code, reset, injections)
+def flip_pattern(code, reset, injections, rounds):
+    base = raw_syndrome(code, reset, [], rounds)
+    err = raw_syndrome(code, reset, injections, rounds)
     return (base ^ err).tolist()
-
-
-def membership_syndrome(code, coord, pauli):
-    """Which ancillas a single data Pauli anticommutes with (clean static view).
-
-    Z data error -> X stabilizers on that qubit; X data error -> Z stabilizers;
-    Y -> both.
-    """
-    lit = []
-    for k, a in enumerate(code.anc_coords):
-        touches = any(dc == coord for _, dc in code.schedule[a])
-        if not touches:
-            continue
-        t = code.anc_type[a]
-        anti = (pauli == "Y") or (pauli == "Z" and t == "X") or (pauli == "X" and t == "Z")
-        if anti:
-            lit.append(k)
-    return lit
 
 
 def build_for_distance(d: int) -> dict:
     code = RotatedSurfaceCode(d)
+    rounds = d + 1  # round 0 projection + d stabilizer rounds (the code's natural depth)
     data = [{"coord": list(c), "index": code.qubit_index[c], "label": f"D{i}"}
             for i, c in enumerate(code.data_coords)]
     anc = [{"coord": list(c), "index": code.qubit_index[c],
@@ -77,43 +59,28 @@ def build_for_distance(d: int) -> dict:
     for tick, ctrl, tgt, typ in code.cnot_enumeration():
         schedule[tick].append({"control": list(ctrl), "target": list(tgt), "type": typ})
 
+    # Per (data qubit, Pauli) single-fault flip pattern, injected at INJECT_ROUND.
+    # The platform places errors at arbitrary rounds by time-shifting this
+    # reference pattern (the repeated circuit is translation-invariant after the
+    # round-0 projection — verified), and combines multiple errors by XOR (the
+    # circuit is Clifford, so Pauli-frame flips add over GF(2)).
     scen = {"reset": {}, "noreset": {}}
     for i, c in enumerate(code.data_coords):
         for p in ("X", "Y", "Z"):
             inj = [{"round": INJECT_ROUND, "pos": "pre", "coord": c, "pauli": p}]
             key = f"D{i}_{p}"
             for mode, reset in (("reset", True), ("noreset", False)):
-                scen[mode][key] = {
-                    "flip": flip_pattern(code, reset, inj),
-                    "membership": membership_syndrome(code, c, p),
-                }
-
-    # a few mid-cycle CNOT faults (hook-error demonstrations)
-    cnot_faults = []
-    enum = code.cnot_enumeration()
-    # pick a handful of interior CNOTs and inject a 2-qubit Pauli after them
-    picks = enum[: min(6, len(enum))]
-    for tick, ctrl, tgt, typ in picks:
-        for pauli in ("XZ", "ZZ"):
-            inj = [{"round": INJECT_ROUND, "pos": "post_cx", "tick": tick,
-                    "control": ctrl, "target": tgt, "pauli": pauli}]
-            cnot_faults.append({
-                "tick": tick, "control": list(ctrl), "target": list(tgt),
-                "type": typ, "pauli": pauli,
-                "flip_reset": flip_pattern(code, True, inj),
-                "flip_noreset": flip_pattern(code, False, inj),
-            })
+                scen[mode][key] = {"flip": flip_pattern(code, reset, inj, rounds)}
 
     return {
         "d": d,
-        "rounds": ROUNDS,
+        "rounds": rounds,
         "inject_round": INJECT_ROUND,
         "data": data,
         "ancillas": anc,
         "schedule": schedule,
         "num_directed_cnots": code.num_directed_cnots(),
         "scenarios": scen,
-        "cnot_faults": cnot_faults,
     }
 
 
