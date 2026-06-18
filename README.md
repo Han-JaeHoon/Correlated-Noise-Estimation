@@ -31,6 +31,7 @@ Roadmap and full detail in [`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md). Status 
 | 2-1 fault injection (deterministic) | ✅ done (stochastic p_bg/p_high pending) |
 | 2-viz self-contained web visualization | ✅ done |
 | **2-2 single-fault syndrome enumeration** | 🔶 **enumeration done** (below); Phase 0 structural comparison pending |
+| 2-dec MWPM decoder (PyMatching) baseline | ✅ done — [`docs/DECODING_SURVEY.md`](docs/DECODING_SURVEY.md) |
 | 2-4 / 2-5 / 2-6 spatial bags · d·k windows · sequential re-run | ⬜ not started |
 
 ### 2-2 · Single-fault syndrome enumeration (`scripts/build_stim_fault_enumeration.py`)

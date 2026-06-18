@@ -159,6 +159,7 @@ class RotatedSurfaceCode:
         rounds: int,
         basis: str = "Z",
         after_cnot_depolarize: float = 0.0,
+        measure_flip: float = 0.0,
         reset: bool = True,
         injections=None,
     ) -> stim.Circuit:
@@ -169,7 +170,9 @@ class RotatedSurfaceCode:
         rounds : number of stabilizer-measurement rounds.
         basis : ``"Z"`` or ``"X"`` memory experiment.
         after_cnot_depolarize : two-qubit depolarizing rate after every CNOT
-            (0 = noiseless; used only for validation / threshold checks).
+            (0 = noiseless; used for validation / threshold / decoder studies).
+        measure_flip : probability of a classical bit-flip on each measurement
+            (``X_ERROR`` before every ``MR``/``M``) — measurement noise. 0 = off.
         reset : if True, ancillas are measured-and-reset every round (``MR``);
             if False, measured without reset (``M``) — the no-reset mode.
         injections : optional list of deterministic fault dicts, each one of
@@ -248,6 +251,8 @@ class RotatedSurfaceCode:
                 c.append("TICK")
             c.append("H", x_anc_idx)
             c.append("TICK")
+            if measure_flip > 0:
+                c.append("X_ERROR", anc_idx, measure_flip)
             c.append("MR" if reset else "M", anc_idx)
             # record indices for this round's ancilla measurements
             round_rec: Dict[Coord, int] = {}
@@ -279,6 +284,8 @@ class RotatedSurfaceCode:
         # final data measurement + reconstruct det_type stabilizers
         if basis == "X":
             c.append("H", data_idx)
+        if measure_flip > 0:
+            c.append("X_ERROR", data_idx, measure_flip)
         c.append("M", data_idx)
         data_rec: Dict[Coord, int] = {}
         for k, dc in enumerate(self.data_coords):

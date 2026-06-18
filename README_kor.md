@@ -27,6 +27,7 @@ rotated surface code에서 **특정 CNOT 게이트가 주된 noise source일 때
 | 2-1 결함 주입 (결정론적) | ✅ 완료 (확률적 p_bg/p_high 미구현) |
 | 2-viz 자족형 웹 시각화 | ✅ 완료 |
 | **2-2 단일결함 신드롬 enumeration** | 🔶 **enumeration 완료**(아래); Phase 0 구조 비교 미완 |
+| 2-dec MWPM 디코더 (PyMatching) baseline | ✅ 완료 — [`docs/DECODING_SURVEY_kor.md`](docs/DECODING_SURVEY_kor.md) |
 | 2-4 / 2-5 / 2-6 spatial bag · d·k 윈도우 · sequential 재실행 | ⬜ 미착수 |
 
 ### 2-2 · 단일결함 신드롬 enumeration (`scripts/build_stim_fault_enumeration.py`)
