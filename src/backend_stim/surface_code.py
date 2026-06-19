@@ -162,6 +162,7 @@ class RotatedSurfaceCode:
         measure_flip: float = 0.0,
         reset: bool = True,
         injections=None,
+        correlated=None,
     ) -> stim.Circuit:
         """Build the memory-experiment circuit.
 
@@ -199,6 +200,27 @@ class RotatedSurfaceCode:
             for p, q in zip(pauli, qubits):
                 if p in ("X", "Y", "Z"):
                     circ.append(p, [q])
+
+        # Correlated two-qubit noise channels, applied EVERY round at the given
+        # position. Each spec: {"when": "pre"|"post_cx"|"pre_measure",
+        # "tick": t (post_cx only), "q1": (x,y), "q2": (x,y),
+        # "paulis": "ZZ"|"XX"|..., "p": prob}. Emitted as a Stim CORRELATED_ERROR
+        # (the Pauli product fires jointly on both qubits with probability p).
+        correlated = correlated or []
+        pre_corr = [f for f in correlated if f["when"] == "pre"]
+        premeas_corr = [f for f in correlated if f["when"] == "pre_measure"]
+        postcx_corr: Dict[int, list] = {}
+        for f in correlated:
+            if f["when"] == "post_cx":
+                postcx_corr.setdefault(f["tick"], []).append(f)
+
+        _tmap = {"X": stim.target_x, "Y": stim.target_y, "Z": stim.target_z}
+
+        def append_corr(circ, f):
+            tgts = [_tmap[p](qi[tuple(q)])
+                    for p, q in zip(f["paulis"], (f["q1"], f["q2"]))]
+            circ.append("CORRELATED_ERROR", tgts, f["p"])
+
         basis = basis.upper()
         if basis not in ("Z", "X"):
             raise ValueError("basis must be 'Z' or 'X'")
@@ -228,6 +250,8 @@ class RotatedSurfaceCode:
             nonlocal meas_count
             for f in pre_inj.get(r, []):
                 apply_pauli(c, f["pauli"], [qi[tuple(f["coord"])]])
+            for f in pre_corr:
+                append_corr(c, f)
             c.append("H", x_anc_idx)
             c.append("TICK")
             for tick in range(4):
@@ -248,9 +272,13 @@ class RotatedSurfaceCode:
                 for f in post_inj.get((r, tick), []):
                     apply_pauli(c, f["pauli"],
                                 [qi[tuple(f["control"])], qi[tuple(f["target"])]])
+                for f in postcx_corr.get(tick, []):
+                    append_corr(c, f)
                 c.append("TICK")
             c.append("H", x_anc_idx)
             c.append("TICK")
+            for f in premeas_corr:
+                append_corr(c, f)
             if measure_flip > 0:
                 c.append("X_ERROR", anc_idx, measure_flip)
             c.append("MR" if reset else "M", anc_idx)
