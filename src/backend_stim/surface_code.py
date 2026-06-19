@@ -190,9 +190,12 @@ class RotatedSurfaceCode:
         injections = injections or []
         pre_inj: Dict[int, list] = {}
         post_inj: Dict[Tuple[int, int], list] = {}
+        premeas_inj: Dict[int, list] = {}
         for f in injections:
             if f["pos"] == "pre":
                 pre_inj.setdefault(f["round"], []).append(f)
+            elif f["pos"] == "pre_measure":
+                premeas_inj.setdefault(f["round"], []).append(f)
             else:
                 post_inj.setdefault((f["round"], f["tick"]), []).append(f)
 
@@ -277,6 +280,8 @@ class RotatedSurfaceCode:
                 c.append("TICK")
             c.append("H", x_anc_idx)
             c.append("TICK")
+            for f in premeas_inj.get(r, []):
+                apply_pauli(c, f["pauli"], [qi[tuple(f["q1"])], qi[tuple(f["q2"])]])
             for f in premeas_corr:
                 append_corr(c, f)
             if measure_flip > 0:
