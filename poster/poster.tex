@@ -69,10 +69,10 @@
 %----------------------------------------------------------------------
 % Handy macros
 %----------------------------------------------------------------------
-\newcommand{\keyfig}[3]{% file, width, caption
+\newcommand{\keyfig}[3]{% file, width, caption (caption at body size for legibility)
   \begin{center}
     \includegraphics[width=#2]{#1}\\[2mm]
-    {\small\itshape #3}
+    {\itshape #3}
   \end{center}}
 
 \newcommand{\bignum}[2]{% number, label
@@ -91,29 +91,29 @@
 
 %---------------------------------------------------------------
 \block{1.\ Motivation}{
-\textbf{Surface codes already measure syndromes every round}\,---\,thousands of
-stabilizer bits are produced purely to detect and decode errors, then discarded.
+\textbf{Surface codes already measure syndromes every round}\,---\,bits generated
+for decoding, then discarded.
 
 \vspace{2mm}
 \begin{tikzpicture}
   \node[draw=Teal, line width=1mm, rounded corners=6pt, fill=Cloud,
-        text width=0.9\linewidth, align=center, inner sep=4mm]
+        text width=0.9\linewidth, align=center, inner sep=3mm]
   {\bfseries
-   \textit{``This syndrome stream is a free probe of the device. Can we read its
-   own fault structure out of data we \underline{already} collect for QEC?''}};
+   \textit{``Can we read the device's own fault structure out of data we
+   \underline{already} collect for QEC?''}};
 \end{tikzpicture}
 
-\vspace{3mm}
-Long-term vision: a \textbf{closed loop} that recycles QEC data into device
-knowledge, then feeds it back into better decoding.
+\vspace{2mm}
+Long-term vision: a \textbf{closed loop} recycling QEC data into device knowledge,
+then back into better decoding:
 
 \vspace{2mm}
 \begin{center}
 \begin{tikzpicture}[
-  node distance=3mm,
-  stage/.style={draw=Ocean, line width=0.8mm, rounded corners=5pt,
-     fill=Cloud, text width=0.80\linewidth, align=center, inner sep=3.2mm},
-  arr/.style={-{Stealth[length=5mm]}, line width=1mm, Teal}]
+  node distance=1.9mm,
+  stage/.style={draw=Ocean, line width=0.7mm, rounded corners=5pt,
+     fill=Cloud, text width=0.76\linewidth, align=center, inner sep=1.9mm},
+  arr/.style={-{Stealth[length=3.5mm]}, line width=0.9mm, Teal}]
   \node[stage] (a) {Repeated syndrome measurements};
   \node[stage, below=of a] (b) {Device information learning};
   \node[stage, below=of b] (c) {Fault / correlation structure inference};
@@ -131,13 +131,13 @@ knowledge, then feeds it back into better decoding.
 
 %---------------------------------------------------------------
 \block{2.\ Case Study \& Problem}{
-\textbf{Setting.} Distance-3 rotated surface code (17 qubits: 9 data + 8 ancilla);
-each stabilizer-extraction round issues \textbf{24 directed CNOTs}. One CNOT is the
-\emph{dominant} fault source (higher fault probability than the rest).
+\textbf{Setting.} Distance-3 rotated surface code (17 qubits); each extraction
+round issues \textbf{24 directed CNOTs}, one of which is the \emph{dominant} fault
+source.
 
 \vspace{2mm}
 \begin{center}
-\begin{tikzpicture}[scale=0.54,
+\begin{tikzpicture}[scale=0.62,
   data/.style={circle, draw=NavyDeep, line width=0.7mm, fill=white,
      minimum size=11mm, font=\small\bfseries},
   zanc/.style={rectangle, draw=Ocean, line width=0.6mm, fill=Teal!25,
@@ -156,49 +156,56 @@ each stabilizer-extraction round issues \textbf{24 directed CNOTs}. One CNOT is 
   \node[zanc] at (-1.5,-4.5) {Z};   % left
   \node[xanc] at (4.5,-7.5)  {X};   % bottom
 \end{tikzpicture}\\[1mm]
-{\footnotesize\itshape Rotated $d{=}3$ layout: 9 data qubits (circles), 8
-Z-/X-stabilizer ancillas (squares / diamonds).}
+{\small\itshape Rotated $d{=}3$ layout: 9 data qubits (circles), 8 Z-/X-stabilizer
+ancillas (squares / diamonds).}
 \end{center}
 
 \vspace{2mm}
 \innerblock{The question}{
-From a temporal syndrome / detection-event sequence $S=(s_1,\dots,s_T)$
-\emph{alone}, identify the \textbf{dominant faulty CNOT} among the 24.
-\textbf{Nuisance factors} (unobserved): which rounds the fault fires, and its Pauli
-type ($XX,\dots,ZZ$).}
+From the syndrome sequence $S=(s_1,\dots,s_T)$ \emph{alone}, identify the
+\textbf{dominant faulty CNOT} among the 24 --- with the fault's rounds and Pauli
+type ($XX,\dots,ZZ$) unobserved.}
 }
 
 %---------------------------------------------------------------
 \block{3.\ Single-Shot Ambiguity}{
-Is one measurement enough? \textbf{No.} When the Pauli type is unknown, distinct
-(CNOT, Pauli) faults can produce \emph{identical} syndromes. Enumerating all $216$
-single-round cases:
+Is one measurement enough? \textbf{No.} With the Pauli type unknown, distinct
+(CNOT, Pauli) faults produce \emph{identical} syndromes:
 
 \vspace{2mm}
 \keyfig{figures/fig_collisions.png}{0.44\linewidth}{%
   Collision map: cell $(i,j)$ counts Pauli pairs for which faults at CNOT$_i$ and
   CNOT$_j$ are indistinguishable.}
 
+\vspace{2mm}
+\innerblock{}{
+\centering
+\begin{tabular}{@{}c@{\hspace{10mm}}c@{}}
+{\LARGE\color{Coral}\textbf{216 $\rightarrow$ 123}} &
+{\LARGE\color{Coral}\textbf{72}} \\[0.5mm]
+{\small unique signatures} & {\small cross-CNOT collision pairs} \\
+\end{tabular}
+
+\vspace{2.5mm}
+{\Large\bfseries Single-shot 24-class CNOT identification is\\[0.3mm]
+{\color{Coral}information-theoretically impossible.}}
+
 \vspace{1mm}
-\innerblock{Hard limit}{
-$216$ cases collapse to $123$ signatures with \bignum{72}{cross-CNOT collisions};
-a single round with known Pauli identifies only $8/24$. \textbf{Single-shot 24-class
-identification is information-theoretically impossible}\,---\,invariant under round
-count and reset mode.}
+{\small Invariant under round count and reset mode.}}
 }
 
 %==================== RIGHT COLUMN ====================================
 \column{0.5}
 
 %---------------------------------------------------------------
-\block{4.\ More Data Breaks the Ambiguity}{
-The way out is \textbf{aggregation}. The same fault is probed either
-\emph{temporally} (a long syndrome stream) or \emph{spatially} (many repeated
-single-round shots):
+\block{4.\ Temporal Information Breaks the Ambiguity}{
+The way out is \textbf{temporal structure}: reading the fault across many rounds.
+The same fault is probed either \emph{temporally} (a long syndrome stream) or
+\emph{spatially} (a bag of repeated single-round shots):
 
 \vspace{2mm}
 \begin{center}
-\scalebox{1.5}{%
+\scalebox{1.72}{%
 \begin{tikzpicture}[scale=1, cell/.style={draw=Ocean, minimum size=3.2mm,
      inner sep=0pt, line width=0.3mm}, on/.style={fill=NavyDeep},
      off/.style={fill=white}]
@@ -227,60 +234,56 @@ single-round shots):
 \end{tikzpicture}}
 \end{center}
 
-\vspace{2mm}
-\keyfig{figures/fig_acc_vs_N.png}{0.80\linewidth}{%
-  Bag-of-shots CNOT accuracy vs bag size $N$. At $N{=}1$ (single shot) accuracy is
-  near random ($1/24$); by \bignum{$N{=}300$}{} it reaches $\approx0.9$\,---\,the
-  ambiguity is broken by data volume, not by a better single shot.}
+\vspace{8mm}
+\keyfig{figures/fig_acc_vs_N.png}{\linewidth}{%
+  Accuracy vs bag size $N$. At $N{=}1$ (single shot) accuracy is near random
+  ($1/24$); by \bignum{$N{=}300$}{} it reaches $\approx0.9$\,---\,identifiability is
+  restored by \textbf{accumulating information across rounds/shots}.}
 }
 
 %---------------------------------------------------------------
-\block{5.\ Learned Decoders: Models \& Performance}{
-Each regime has a matched model class. Best performers so far
-(\textbf{preliminary}, naive $d{=}3$):
+\block{5.\ Learned Decoders}{
+Two matched model classes, one per regime:
 
-\vspace{2mm}
+\vspace{6mm}
 \begin{center}
-\scalebox{1.32}{%
+\scalebox{1.6}{%
 \begin{tikzpicture}[font=\footnotesize,
   b/.style={draw=Ocean, line width=0.5mm, rounded corners=3pt, fill=Cloud,
-     align=center, inner sep=1.5mm, minimum height=7mm},
+     align=center, inner sep=1.7mm, minimum height=7.5mm},
   sm/.style={b, fill=Amber!25, draw=Amber},
   ar/.style={-{Stealth[length=2.5mm]}, line width=0.6mm, Ocean}]
-  % --- Temporal row (y=0) ---
+  % --- Temporal row (GRU) ---
   \node[font=\footnotesize\bfseries, Teal] (tl) at (0,0) {Temporal};
-  \node[b, right=3mm of tl] (t0) {$(T{\times}8)$};
+  \node[b, right=3mm of tl] (t0) {$(T{\times}8)$ stream};
   \node[b, right=3mm of t0] (t1) {\textbf{GRU}};
-  \node[b, right=3mm of t1] (t2) {dense};
-  \node[sm, right=3mm of t2] (t3) {softmax\,(24)};
-  \draw[ar](t0)--(t1);\draw[ar](t1)--(t2);\draw[ar](t2)--(t3);
-  % --- Spatial row (y=-1.7) ---
+  \node[sm, right=3mm of t1] (t3) {softmax\,(24)};
+  \draw[ar](t0)--(t1);\draw[ar](t1)--(t3);
+  % --- Spatial row (LogReg) ---
   \node[font=\footnotesize\bfseries, Coral] (sl) at (0,-1.7) {Spatial};
-  \node[b, right=3mm of sl] (s0) {bag $\{$shots$\}$};
-  \node[b, right=3mm of s0] (s1) {per-shot $\phi$};
-  \node[b, right=3mm of s1] (s2) {mean pool};
-  \node[b, right=3mm of s2] (s3) {MLP $\rho$};
-  \node[sm, right=3mm of s3] (s4) {softmax\,(24)};
-  \draw[ar](s0)--(s1);\draw[ar](s1)--(s2);\draw[ar](s2)--(s3);\draw[ar](s3)--(s4);
-\end{tikzpicture}}\\[2mm]
-{\footnotesize\itshape Deep Sets (spatial) is permutation-invariant over the bag;
-a linear LogReg on pooled features is a strong baseline.}
+  \node[b, right=3mm of sl] (s0) {bag of $N$ shots};
+  \node[b, right=3mm of s0] (s1) {mean pool};
+  \node[b, right=3mm of s1] (s2) {\textbf{LogReg}};
+  \node[sm, right=3mm of s2] (s3) {softmax\,(24)};
+  \draw[ar](s0)--(s1);\draw[ar](s1)--(s2);\draw[ar](s2)--(s3);
+\end{tikzpicture}}
 \end{center}
 
+\vspace{12mm}
+\innerblock{}{
+\centering
+{\large\bfseries Best accuracy}\quad
+\colorbox{Amber!30}{\textbf{\normalsize preliminary $\cdot$ $d{=}3$}}
+
 \vspace{3mm}
-\keyfig{figures/fig_acc_vs_T.png}{\linewidth}{%
-  Temporal accuracy vs sequence length $T$ (three fault-model scenarios). The
-  \textbf{GRU} (blue) climbs with $T$ to $\approx95\%$ (R2), breaking the
-  rule-based single-round ceiling ($0.75$); RNN / transformer lag.}
+\begin{tabular}{@{}c@{\hspace{12mm}}c@{}}
+{\Huge\color{Coral}\textbf{$\approx$95\%}} & {\Huge\color{Coral}\textbf{$\approx$94\%}} \\[1mm]
+{\large Temporal \textbf{GRU}} & {\large Spatial \textbf{LogReg}} \\
+& {\small ($N{=}300$ shots/bag)} \\
+\end{tabular}
 
 \vspace{2mm}
-\innerblock{Best accuracy so far (preliminary, $d{=}3$)}{
-\centering
-\begin{tabular}{@{}c@{\hspace{4mm}}c@{}}
-{\LARGE\color{Coral}\textbf{$\approx$95\%}} & {\LARGE\color{Coral}\textbf{$\approx$94\%}} \\[0.5mm]
-Temporal \textbf{GRU} & Spatial \textbf{LogReg} ($N{=}300$) \\
-\end{tabular}\\[1.5mm]
-{\footnotesize Reported as in-progress, not final performance claims.}}
+{\small The GRU breaks the rule-based single-round ceiling ($0.75$).}}
 }
 
 \end{columns}
