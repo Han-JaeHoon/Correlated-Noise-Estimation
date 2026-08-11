@@ -198,6 +198,7 @@ single-round shots):
 
 \vspace{2mm}
 \begin{center}
+\scalebox{1.5}{%
 \begin{tikzpicture}[scale=1, cell/.style={draw=Ocean, minimum size=3.2mm,
      inner sep=0pt, line width=0.3mm}, on/.style={fill=NavyDeep},
      off/.style={fill=white}]
@@ -223,7 +224,7 @@ single-round shots):
     \node[font=\footnotesize\itshape, text width=3.6cm, align=center] at (1.2,-2.7)
        {\textbf{Spatial:} unordered bag of $N$ shots};
   \end{scope}
-\end{tikzpicture}
+\end{tikzpicture}}
 \end{center}
 
 \vspace{2mm}
@@ -240,6 +241,7 @@ Each regime has a matched model class. Best performers so far
 
 \vspace{2mm}
 \begin{center}
+\scalebox{1.32}{%
 \begin{tikzpicture}[font=\footnotesize,
   b/.style={draw=Ocean, line width=0.5mm, rounded corners=3pt, fill=Cloud,
      align=center, inner sep=1.5mm, minimum height=7mm},
@@ -260,21 +262,25 @@ Each regime has a matched model class. Best performers so far
   \node[b, right=3mm of s2] (s3) {MLP $\rho$};
   \node[sm, right=3mm of s3] (s4) {softmax\,(24)};
   \draw[ar](s0)--(s1);\draw[ar](s1)--(s2);\draw[ar](s2)--(s3);\draw[ar](s3)--(s4);
-\end{tikzpicture}\\[1mm]
+\end{tikzpicture}}\\[2mm]
 {\footnotesize\itshape Deep Sets (spatial) is permutation-invariant over the bag;
 a linear LogReg on pooled features is a strong baseline.}
 \end{center}
 
-\vspace{2mm}
-\keyfig{figures/fig_acc_vs_T.png}{0.86\linewidth}{%
+\vspace{3mm}
+\keyfig{figures/fig_acc_vs_T.png}{\linewidth}{%
   Temporal accuracy vs sequence length $T$ (three fault-model scenarios). The
-  \textbf{GRU} (blue) climbs with $T$ to \bignum{$\approx\!95\%$}{(R2)}, breaking the
+  \textbf{GRU} (blue) climbs with $T$ to $\approx95\%$ (R2), breaking the
   rule-based single-round ceiling ($0.75$); RNN / transformer lag.}
 
-\vspace{1mm}
-\innerblock{Headline (preliminary)}{
-Temporal GRU $\approx95\%$; spatial LogReg $\approx94\%$ at $N{=}300$. Reported as
-in-progress, not final performance claims.}
+\vspace{2mm}
+\innerblock{Best accuracy so far (preliminary, $d{=}3$)}{
+\centering
+\begin{tabular}{@{}c@{\hspace{4mm}}c@{}}
+{\LARGE\color{Coral}\textbf{$\approx$95\%}} & {\LARGE\color{Coral}\textbf{$\approx$94\%}} \\[0.5mm]
+Temporal \textbf{GRU} & Spatial \textbf{LogReg} ($N{=}300$) \\
+\end{tabular}\\[1.5mm]
+{\footnotesize Reported as in-progress, not final performance claims.}}
 }
 
 \end{columns}
