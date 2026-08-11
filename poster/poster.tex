@@ -15,7 +15,8 @@
 \usepackage{booktabs}
 \usepackage{multicol}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, backgrounds, fit}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, backgrounds, fit,
+                decorations.pathreplacing}
 
 %----------------------------------------------------------------------
 % Colour palette
@@ -126,9 +127,6 @@ knowledge, then feeds it back into better decoding.
 \end{tikzpicture}
 \end{center}
 
-\vspace{1mm}
-{\small This poster reports the \textbf{first link}: what fault information is\,---\,and
-is \emph{not}\,---\,recoverable from syndromes alone.}
 }
 
 %---------------------------------------------------------------
@@ -139,7 +137,7 @@ each stabilizer-extraction round issues \textbf{24 directed CNOTs}. One CNOT is 
 
 \vspace{2mm}
 \begin{center}
-\begin{tikzpicture}[scale=0.62,
+\begin{tikzpicture}[scale=0.54,
   data/.style={circle, draw=NavyDeep, line width=0.7mm, fill=white,
      minimum size=11mm, font=\small\bfseries},
   zanc/.style={rectangle, draw=Ocean, line width=0.6mm, fill=Teal!25,
@@ -152,12 +150,14 @@ each stabilizer-extraction round issues \textbf{24 directed CNOTs}. One CNOT is 
   % interior weight-4 plaquettes (checkerboard)
   \node[zanc] at (1.5,-1.5) {Z}; \node[xanc] at (4.5,-1.5) {X};
   \node[xanc] at (1.5,-4.5) {X}; \node[zanc] at (4.5,-4.5) {Z};
-  % boundary weight-2 stabilizers (outside the tile)
-  \node[xanc] at (3.0, 1.6) {X}; \node[xanc] at (3.0,-7.6) {X};
-  \node[zanc] at (-1.6,-3.0) {Z}; \node[zanc] at (7.6,-3.0) {Z};
+  % boundary weight-2 stabilizers (diagonally offset, rotated-code style)
+  \node[xanc] at (1.5, 1.5)  {X};   % top
+  \node[zanc] at (7.5,-1.5)  {Z};   % right
+  \node[zanc] at (-1.5,-4.5) {Z};   % left
+  \node[xanc] at (4.5,-7.5)  {X};   % bottom
 \end{tikzpicture}\\[1mm]
-{\footnotesize\itshape Rotated $d{=}3$ layout (schematic): data qubits (circles),
-Z-/X-type ancillas (squares / diamonds).}
+{\footnotesize\itshape Rotated $d{=}3$ layout: 9 data qubits (circles), 8
+Z-/X-stabilizer ancillas (squares / diamonds).}
 \end{center}
 
 \vspace{2mm}
@@ -169,61 +169,112 @@ type ($XX,\dots,ZZ$).}
 }
 
 %---------------------------------------------------------------
-\block{3.\ Beyond Single-Shot}{
-Exact enumeration (\S5) bounds \emph{single-shot} inference. Aggregating many noisy
-sequences / shots can push past that ceiling.
+\block{3.\ Single-Shot Ambiguity}{
+Is one measurement enough? \textbf{No.} When the Pauli type is unknown, distinct
+(CNOT, Pauli) faults can produce \emph{identical} syndromes. Enumerating all $216$
+single-round cases:
 
 \vspace{2mm}
-\innerblock{Preliminary, naive $d{=}3$ model}{
-Rule-based single-round \textbf{ceiling}: $18/24 = 0.75$. \\
-Sequence model (GRU), temporal: \bignum{$\approx\!95\%$}{}. \\
-Bag-of-shots (LogReg), spatial: \bignum{$\approx\!94\%$}{}.}
+\keyfig{figures/fig_collisions.png}{0.44\linewidth}{%
+  Collision map: cell $(i,j)$ counts Pauli pairs for which faults at CNOT$_i$ and
+  CNOT$_j$ are indistinguishable.}
 
-\vspace{2mm}
-{\footnotesize Statistical aggregation breaks the rule-based ceiling\,---\,reported
-as \textbf{preliminary}, not a final performance claim.}
+\vspace{1mm}
+\innerblock{Hard limit}{
+$216$ cases collapse to $123$ signatures with \bignum{72}{cross-CNOT collisions};
+a single round with known Pauli identifies only $8/24$. \textbf{Single-shot 24-class
+identification is information-theoretically impossible}\,---\,invariant under round
+count and reset mode.}
 }
 
 %==================== RIGHT COLUMN ====================================
 \column{0.5}
 
 %---------------------------------------------------------------
-\block{4.\ Temporal Information Threshold}{
-Fix the Pauli type ($XZ$); enumerate the exact syndrome fingerprint of a single
-fault at each CNOT and count how many of the 24 become distinguishable.
+\block{4.\ More Data Breaks the Ambiguity}{
+The way out is \textbf{aggregation}. The same fault is probed either
+\emph{temporally} (a long syndrome stream) or \emph{spatially} (many repeated
+single-round shots):
 
 \vspace{2mm}
-\keyfig{figures/fig_round1_degeneracy.png}{\linewidth}{%
-  \textbf{One round.} Only \bignum{8}{of 24} CNOTs are uniquely identified;
-  11 are syndrome-silent at round 0.}
+\begin{center}
+\begin{tikzpicture}[scale=1, cell/.style={draw=Ocean, minimum size=3.2mm,
+     inner sep=0pt, line width=0.3mm}, on/.style={fill=NavyDeep},
+     off/.style={fill=white}]
+  % --- temporal (T x 8) ---
+  \begin{scope}[shift={(0,0)}]
+    \foreach \r in {0,...,5}{\foreach \c in {0,...,7}{
+       \pgfmathparse{(mod(\r*3+\c*2+1,5)<2)?"on":"off"}\edef\st{\pgfmathresult}
+       \node[cell,\st] at (\c*0.34,-\r*0.34) {};}}
+    \node[font=\footnotesize] at (1.2,0.5) {8 stabilizers};
+    \draw[-{Stealth[length=3mm]}, Teal, line width=0.7mm]
+       (-0.45,0.1) -- (-0.45,-1.8) node[midway,left,font=\footnotesize,rotate=90,anchor=south]{$T$ rounds};
+    \node[font=\footnotesize\itshape, text width=3.4cm, align=center] at (1.2,-2.35)
+       {\textbf{Temporal:} ordered $(T\times8)$ stream};
+  \end{scope}
+  % --- spatial (bag of N shots) ---
+  \begin{scope}[shift={(5.2,0)}]
+    \foreach \r in {0,...,3}{\foreach \c in {0,...,7}{
+       \pgfmathparse{(mod(\r*5+\c*3+2,7)<3)?"on":"off"}\edef\st{\pgfmathresult}
+       \node[cell,\st] at (\c*0.34,-\r*0.48) {};}}
+    \node[font=\footnotesize] at (1.2,0.5) {8 stabilizers};
+    \draw[decorate, decoration={brace, amplitude=4pt}, line width=0.6mm, Amber]
+       (-0.35,0.15) -- (-0.35,-1.55) node[midway,left,font=\footnotesize,xshift=-2pt]{$N$};
+    \node[font=\footnotesize\itshape, text width=3.6cm, align=center] at (1.2,-2.35)
+       {\textbf{Spatial:} unordered bag of $N$ shots};
+  \end{scope}
+\end{tikzpicture}
+\end{center}
 
-\vspace{1mm}
-\keyfig{figures/fig_round2_degeneracy.png}{0.82\linewidth}{%
-  \textbf{Two rounds.} \bignum{24}{of 24} CNOTs uniquely identified\,---\,a sharp
-  threshold; further rounds add no new information.}
-
-\vspace{1mm}
-\innerblock{Takeaway}{
-With the Pauli type known, the \textbf{\emph{temporal} extent} of the record\,---\,not
-its size\,---\,unlocks identification: $1\!\to\!2$ rounds moves $8/24\to24/24$.}
+\vspace{2mm}
+\keyfig{figures/fig_acc_vs_N.png}{0.80\linewidth}{%
+  Bag-of-shots CNOT accuracy vs bag size $N$. At $N{=}1$ (single shot) accuracy is
+  near random ($1/24$); by \bignum{$N{=}300$}{} it reaches $\approx0.9$\,---\,the
+  ambiguity is broken by data volume, not by a better single shot.}
 }
 
 %---------------------------------------------------------------
-\block{5.\ Cross-Pauli Ambiguity Wall}{
-When the Pauli type is \emph{unknown}, distinct (CNOT, Pauli) faults can produce
-\emph{identical} syndromes. Enumerating all $216$ cases:
+\block{5.\ Learned Decoders: Models \& Performance}{
+Each regime has a matched model class. Best performers so far
+(\textbf{preliminary}, naive $d{=}3$):
 
 \vspace{2mm}
-\keyfig{figures/fig_collisions.png}{0.54\linewidth}{%
-  Collision map: cell $(i,j)$ counts Pauli pairs making faults at CNOT$_i$ and
-  CNOT$_j$ indistinguishable ($n_{\text{rounds}}{=}2$).}
+\begin{center}
+\begin{tikzpicture}[font=\footnotesize,
+  b/.style={draw=Ocean, line width=0.5mm, rounded corners=3pt, fill=Cloud,
+     align=center, inner sep=1.5mm, minimum height=7mm},
+  sm/.style={b, fill=Amber!25, draw=Amber},
+  ar/.style={-{Stealth[length=2.5mm]}, line width=0.6mm, Ocean}]
+  % --- Temporal row (y=0) ---
+  \node[font=\footnotesize\bfseries, Teal] (tl) at (0,0) {Temporal};
+  \node[b, right=3mm of tl] (t0) {$(T{\times}8)$};
+  \node[b, right=3mm of t0] (t1) {\textbf{GRU}};
+  \node[b, right=3mm of t1] (t2) {dense};
+  \node[sm, right=3mm of t2] (t3) {softmax\,(24)};
+  \draw[ar](t0)--(t1);\draw[ar](t1)--(t2);\draw[ar](t2)--(t3);
+  % --- Spatial row (y=-1.7) ---
+  \node[font=\footnotesize\bfseries, Coral] (sl) at (0,-1.7) {Spatial};
+  \node[b, right=3mm of sl] (s0) {bag $\{$shots$\}$};
+  \node[b, right=3mm of s0] (s1) {per-shot $\phi$};
+  \node[b, right=3mm of s1] (s2) {mean pool};
+  \node[b, right=3mm of s2] (s3) {MLP $\rho$};
+  \node[sm, right=3mm of s3] (s4) {softmax\,(24)};
+  \draw[ar](s0)--(s1);\draw[ar](s1)--(s2);\draw[ar](s2)--(s3);\draw[ar](s3)--(s4);
+\end{tikzpicture}\\[1mm]
+{\footnotesize\itshape Deep Sets (spatial) is permutation-invariant over the bag;
+a linear LogReg on pooled features is a strong baseline.}
+\end{center}
+
+\vspace{2mm}
+\keyfig{figures/fig_acc_vs_T.png}{0.86\linewidth}{%
+  Temporal accuracy vs sequence length $T$ (three fault-model scenarios). The
+  \textbf{GRU} (blue) climbs with $T$ to \bignum{$\approx\!95\%$}{(R2)}, breaking the
+  rule-based single-round ceiling ($0.75$); RNN / transformer lag.}
 
 \vspace{1mm}
-\innerblock{Hard limit}{
-The 216 cases collapse to 123 unique signatures with \bignum{72}{cross-CNOT
-collisions}. With single-round faults and unknown Pauli type, \textbf{single-shot
-24-class identification is information-theoretically impossible}\,---\,invariant
-under round count and reset mode.}
+\innerblock{Headline (preliminary)}{
+Temporal GRU $\approx95\%$; spatial LogReg $\approx94\%$ at $N{=}300$. Reported as
+in-progress, not final performance claims.}
 }
 
 \end{columns}
@@ -243,7 +294,7 @@ under round count and reset mode.}
   correlation structure into \textbf{device-aware decoding}.
 \end{minipage}
 
-\vspace{4mm}
+\vspace{2mm}
 \begin{center}\small
 Code, data \& figures: \texttt{Correlated-Noise-Estimation} repository
 \quad\textbullet\quad Contact: \texttt{pjhhan.research@gmail.com}
