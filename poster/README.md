@@ -53,7 +53,9 @@ appear automatically (no code change needed):
 - `figures/logo_nbi.png` — top-left (Niels Bohr Quantum Summer School)
 - `figures/logo_kaist.png` — top-right (KAIST)
 
-Until a file is present, a labelled placeholder box is shown. Each logo sits on
-a **white rounded panel**, so a dark/coloured logo (e.g. KAIST navy) stays
-visible against the dark header. PNG with a transparent background works best;
-the panel is 4.2 × 3.0 cm and the image is fit to 3.6 × 2.4 cm keeping aspect.
+Until a file is present, a labelled placeholder box is shown. Logos are placed
+**directly on the dark navy header** (no white panel): the NBI logo is
+self-contained, and the KAIST wordmark is **white**, so it reads on the dark
+background — a white panel would hide it. Use transparent-background PNGs.
+Current sizes: `logo_nbi.png` at height 3 cm, `logo_kaist.png` at height 1.7 cm
+(tweak the `height=` values in `\leftlogo` / `\rightlogo` if needed).

@@ -93,26 +93,24 @@
 %----------------------------------------------------------------------
 % Header logos
 %   Drop real logos into  figures/logo_nbi.png  and  figures/logo_kaist.png
-%   (PNG with transparent background works best). If a file is absent a
-%   labelled placeholder box is shown instead. Logos sit on a WHITE rounded
-%   panel so a dark/colour logo (e.g. KAIST) stays visible on the navy header.
+%   (transparent-background PNG). If a file is absent, a labelled placeholder
+%   is shown. Logos are placed DIRECTLY on the dark header:
+%     - the NBI logo is self-contained (its own purple tile);
+%     - the KAIST logo is WHITE, so it reads on the navy header and must NOT be
+%       put on a white panel (which would hide it).
 %----------------------------------------------------------------------
-\newcommand{\logopanel}[1]{% content -> white rounded panel
-  \begin{tikzpicture}
-    \node[fill=white, rounded corners=6pt, inner sep=3mm, minimum width=4.2cm,
-          minimum height=3.0cm]{#1};
-  \end{tikzpicture}}
-\newcommand{\placeholderlogo}[1]{% dashed placeholder inside the white panel
-  \makebox[3.6cm][c]{\parbox[c][2.4cm][c]{3.6cm}{\centering
-    \color{Ocean}\footnotesize\itshape #1\\[1mm]\scriptsize(logo placeholder)}}}
+\newcommand{\placeholderlogo}[2]{% #1 = label, #2 = box width
+  \tikz\node[draw=white!55, line width=0.6pt, dashed, rounded corners=4pt,
+     inner sep=2.5mm, minimum width=#2, minimum height=2cm, align=center,
+     text=white!85]{\footnotesize\itshape #1\\[0.5mm]\scriptsize(add logo file)};}
 \newcommand{\leftlogo}{%
-  \logopanel{\IfFileExists{figures/logo_nbi.png}
-    {\includegraphics[height=2.4cm,width=3.6cm,keepaspectratio]{figures/logo_nbi.png}}
-    {\placeholderlogo{Niels Bohr Quantum Summer School}}}}
+  \IfFileExists{figures/logo_nbi.png}
+    {\includegraphics[height=3cm]{figures/logo_nbi.png}}
+    {\placeholderlogo{Niels Bohr\\Quantum Summer School}{3.4cm}}}
 \newcommand{\rightlogo}{%
-  \logopanel{\IfFileExists{figures/logo_kaist.png}
-    {\includegraphics[height=2.4cm,width=3.6cm,keepaspectratio]{figures/logo_kaist.png}}
-    {\placeholderlogo{KAIST}}}}
+  \IfFileExists{figures/logo_kaist.png}
+    {\includegraphics[height=1.7cm]{figures/logo_kaist.png}}
+    {\placeholderlogo{KAIST}{4.4cm}}}
 
 \begin{document}
 \maketitle[titletotopverticalspace=5mm, titletoblockverticalspace=10mm]
