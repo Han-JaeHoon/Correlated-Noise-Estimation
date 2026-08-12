@@ -45,9 +45,15 @@ probabilistic / general-`d` work is phrased as **in progress**, not confirmed.
   **pdfLaTeX**, compile. No shell-escape or external assets required.
 - **Local**: `pdflatex poster.tex` (needs `tikzposter`, `lmodern`, `booktabs`).
 
-## Placeholders to fill in
+## Logos
 
-Header carries placeholders — replace before printing:
+The header shows a logo panel on each side. Drop the real logos in and they
+appear automatically (no code change needed):
 
-- `[co-authors / advisor placeholder]`
-- `[Institution / Group placeholder]`
+- `figures/logo_nbi.png` — top-left (Niels Bohr Quantum Summer School)
+- `figures/logo_kaist.png` — top-right (KAIST)
+
+Until a file is present, a labelled placeholder box is shown. Each logo sits on
+a **white rounded panel**, so a dark/coloured logo (e.g. KAIST navy) stays
+visible against the dark header. PNG with a transparent background works best;
+the panel is 4.2 × 3.0 cm and the image is fit to 3.6 × 2.4 cm keeping aspect.

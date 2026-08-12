@@ -1,6 +1,6 @@
 %=====================================================================
 %  A1 PORTRAIT ACADEMIC POSTER
-%  Surface-Code Syndrome Utilization for Fault Identification
+%  Correlated Noise Estimation via Surface-Code Syndrome Utilization
 %
 %  Compile on Overleaf with pdfLaTeX (self-contained, no shell-escape).
 %  Figures live in ./figures/ (real analysis outputs from the codebase).
@@ -48,13 +48,23 @@
 
 \settitle{
   \centering
+  \vspace{2mm}
+  % --- top row: logos flanking the centred title block ---
+  \begin{minipage}[c]{0.17\linewidth}\centering \leftlogo \end{minipage}%
+  \hfill
+  \begin{minipage}[c]{0.64\linewidth}\centering
+    {\color{titlefgcolor}\bfseries\huge
+     Correlated Noise Estimation via\\[1mm]
+     Surface-Code Syndrome Utilization\par}
+    \vspace{4mm}
+    {\color{titlefgcolor}\Large
+     Can repeated stabilizer syndromes reveal \emph{where} a device is
+     faulty\,---\,not just \emph{that} it is?\par}
+  \end{minipage}%
+  \hfill
+  \begin{minipage}[c]{0.17\linewidth}\centering \rightlogo \end{minipage}%
+  \par
   \vspace{3mm}
-  {\color{titlefgcolor}\bfseries\Huge
-   Surface-Code Syndrome Utilization for Fault Identification\par}
-  \vspace{4mm}
-  {\color{titlefgcolor}\Large
-   Can repeated stabilizer syndromes reveal \emph{where} a device is faulty\,---\,not just \emph{that} it is?\par}
-  \vspace{5mm}
   {\color{titlefgcolor}\large
    \textbf{Jaehun Han}, KAIST Graduate School of Quantum Science and Technology
    $\cdot$ ETRI Quantum Computing Research Section\par}
@@ -79,6 +89,30 @@
 
 % remove the default "LaTeX TikZposter" watermark
 \tikzposterlatexaffectionproofoff
+
+%----------------------------------------------------------------------
+% Header logos
+%   Drop real logos into  figures/logo_nbi.png  and  figures/logo_kaist.png
+%   (PNG with transparent background works best). If a file is absent a
+%   labelled placeholder box is shown instead. Logos sit on a WHITE rounded
+%   panel so a dark/colour logo (e.g. KAIST) stays visible on the navy header.
+%----------------------------------------------------------------------
+\newcommand{\logopanel}[1]{% content -> white rounded panel
+  \begin{tikzpicture}
+    \node[fill=white, rounded corners=6pt, inner sep=3mm, minimum width=4.2cm,
+          minimum height=3.0cm]{#1};
+  \end{tikzpicture}}
+\newcommand{\placeholderlogo}[1]{% dashed placeholder inside the white panel
+  \makebox[3.6cm][c]{\parbox[c][2.4cm][c]{3.6cm}{\centering
+    \color{Ocean}\footnotesize\itshape #1\\[1mm]\scriptsize(logo placeholder)}}}
+\newcommand{\leftlogo}{%
+  \logopanel{\IfFileExists{figures/logo_nbi.png}
+    {\includegraphics[height=2.4cm,width=3.6cm,keepaspectratio]{figures/logo_nbi.png}}
+    {\placeholderlogo{Niels Bohr Quantum Summer School}}}}
+\newcommand{\rightlogo}{%
+  \logopanel{\IfFileExists{figures/logo_kaist.png}
+    {\includegraphics[height=2.4cm,width=3.6cm,keepaspectratio]{figures/logo_kaist.png}}
+    {\placeholderlogo{KAIST}}}}
 
 \begin{document}
 \maketitle[titletotopverticalspace=5mm, titletoblockverticalspace=10mm]
